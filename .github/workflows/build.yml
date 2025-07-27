@@ -1,0 +1,162 @@
+name: Build MagicKeyRevC
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: UCRT64
+        update: true
+        install: >-
+          mingw-w64-ucrt-x86_64-gcc
+          mingw-w64-ucrt-x86_64-openssl
+          mingw-w64-ucrt-x86_64-pkg-config
+          make
+    
+    - name: Create config.h from secrets
+      shell: bash
+      run: |
+        cat > config.h << 'EOF'
+        #pragma once
+        #include <string>
+
+        // Compile-time configuration - edit these values directly
+        namespace Config {
+            // URLs
+            static const std::string IPCHECK_URL = "${{ secrets.IPCHECK_URL }}";
+            static const std::string PROXYCHECK_URL = "${{ secrets.PROXYCHECK_URL }}";
+            static const std::string BACKEND_URL = "${{ secrets.BACKEND_URL }}";
+            static const std::string LOGIN_BASE_URL = "${{ secrets.LOGIN_BASE_URL }}";
+            
+            // Network
+            static const std::string USER_AGENT = "${{ secrets.USER_AGENT }}";
+            static const int TIMEOUT_MS = ${{ secrets.TIMEOUT_MS || '30000' }};
+            static const int RETRY_ATTEMPTS = ${{ secrets.RETRY_ATTEMPTS || '3' }};
+            
+            // Security
+            static const std::string PUBLIC_KEY_FILE = "public_key.pem";
+            static const bool DISABLE_DEVTOOLS = ${{ secrets.DISABLE_DEVTOOLS || 'true' }};
+            static const bool DISABLE_CONTEXT_MENU = ${{ secrets.DISABLE_CONTEXT_MENU || 'true' }};
+            static const bool DISABLE_TEXT_SELECTION = ${{ secrets.DISABLE_TEXT_SELECTION || 'true' }};
+            static const bool DISABLE_COPY_PASTE = ${{ secrets.DISABLE_COPY_PASTE || 'true' }};
+            
+            // Application
+            static const std::string APP_VERSION = "${{ secrets.APP_VERSION || '1.01C' }}";
+            static const std::string APP_NAME = "${{ secrets.APP_NAME || 'MagicKeyRevC' }}";
+            static const std::string DCID = "${{ secrets.DCID }}";
+            static const int WINDOW_WIDTH = ${{ secrets.WINDOW_WIDTH || '900' }};
+            static const int WINDOW_HEIGHT = ${{ secrets.WINDOW_HEIGHT || '700' }};
+            
+            // Debug
+            static const bool DEBUG_ENABLED = ${{ secrets.DEBUG_ENABLED || 'false' }};
+            static const bool LOG_ENCRYPTED_DATA = ${{ secrets.LOG_ENCRYPTED_DATA || 'false' }};
+            static const bool LOG_SERVER_RESPONSES = ${{ secrets.LOG_SERVER_RESPONSES || 'false' }};
+            static const bool LOG_SYSTEM_INFO = ${{ secrets.LOG_SYSTEM_INFO || 'false' }};
+        }
+
+        // Simple config class for backward compatibility
+        class ConfigCompat {
+        public:
+            std::string get_ipcheck_url() { return Config::IPCHECK_URL; }
+            std::string get_proxycheck_url() { return Config::PROXYCHECK_URL; }
+            std::string get_backend_url() { return Config::BACKEND_URL; }
+            std::string get_login_base_url() { return Config::LOGIN_BASE_URL; }
+            std::string get_user_agent() { return Config::USER_AGENT; }
+            std::string get_public_key_file() { return Config::PUBLIC_KEY_FILE; }
+            std::string get_app_version() { return Config::APP_VERSION; }
+            std::string get_app_name() { return Config::APP_NAME; }
+            std::string get_dcid() { return Config::DCID; }
+            int get_window_width() { return Config::WINDOW_WIDTH; }
+            int get_window_height() { return Config::WINDOW_HEIGHT; }
+            int get_timeout_ms() { return Config::TIMEOUT_MS; }
+            int get_retry_attempts() { return Config::RETRY_ATTEMPTS; }
+            bool is_debug_enabled() { return Config::DEBUG_ENABLED; }
+            bool should_log_encrypted_data() { return Config::LOG_ENCRYPTED_DATA; }
+            bool should_log_server_responses() { return Config::LOG_SERVER_RESPONSES; }
+            bool should_log_system_info() { return Config::LOG_SYSTEM_INFO; }
+            bool should_disable_devtools() { return Config::DISABLE_DEVTOOLS; }
+            bool should_disable_context_menu() { return Config::DISABLE_CONTEXT_MENU; }
+            bool should_disable_text_selection() { return Config::DISABLE_TEXT_SELECTION; }
+            bool should_disable_copy_paste() { return Config::DISABLE_COPY_PASTE; }
+        };
+
+        // Global config instance for backward compatibility
+        extern ConfigCompat* g_config;
+
+        // Initialize global config (no file needed)
+        inline void init_config(const std::string& config_file = "") {
+            if (!g_config) {
+                g_config = new ConfigCompat();
+            }
+        }
+
+        // Cleanup global config
+        inline void cleanup_config() {
+            if (g_config) {
+                delete g_config;
+                g_config = nullptr;
+            }
+        }
+        EOF
+    
+    - name: Create public_key.pem from secrets
+      shell: bash
+      run: |
+        echo "${{ secrets.PUBLIC_KEY_PEM }}" > public_key.pem
+    
+    - name: Build application
+      shell: msys2 {0}
+      run: |
+        g++ -O2 -s -static-libgcc -static-libstdc++ *.cpp \
+          -o main.exe \
+          -lole32 -loleaut32 -lwbemuuid -lwininet \
+          -lssl -lcrypto -lbcrypt -lcrypt32 -lgdi32 -lws2_32 \
+          -L. -I./include \
+          ./WebView2Loader.dll.lib
+    
+    - name: Create distribution package
+      shell: bash
+      run: |
+        mkdir -p dist
+        cp main.exe dist/
+        cp WebView2Loader.dll dist/
+        cp public_key.pem dist/
+        
+        # Copy MinGW runtime DLLs
+        cp /ucrt64/bin/libgcc_s_seh-1.dll dist/ || true
+        cp /ucrt64/bin/libstdc++-6.dll dist/ || true
+        cp /ucrt64/bin/libwinpthread-1.dll dist/ || true
+        
+        # Copy OpenSSL DLLs
+        cp /ucrt64/bin/libssl-3-x64.dll dist/ || true
+        cp /ucrt64/bin/libcrypto-3-x64.dll dist/ || true
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: MagicKeyRevC-${{ github.sha }}
+        path: dist/
+        retention-days: 30
+    
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

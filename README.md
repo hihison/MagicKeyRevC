@@ -77,6 +77,16 @@ The `./bin/` directory contains everything needed for distribution:
 - `build.bat` - Batch file for Command Prompt
 - Manual build commands available in [BUILD.md](BUILD.md)
 
+## ☁️ GitHub Actions (Automated Building)
+
+Set up automated building with your private configuration:
+- **Builds automatically** on push to main branch
+- **Uses GitHub Secrets** for your private configuration
+- **Creates release packages** with all dependencies
+- **No sensitive data** in repository
+
+📖 **See [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md) for setup instructions**
+
 ## 🆘 Support
 
 - Check [SETUP.md](SETUP.md) for detailed setup instructions
@@ -172,3 +182,4 @@ For issues and questions:
 1. Check the documentation in the `docs/` directory
 2. Review common issues in this README
 3. Create an issue with detailed error information
+# MagicKeyRevC
