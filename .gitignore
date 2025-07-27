@@ -1,0 +1,84 @@
+# Sensitive configuration files - DO NOT UPLOAD TO GITHUB
+config.h
+config_defaults.cpp
+config.json
+config-dev.json
+config-prod.json
+
+# Private keys and certificates - NEVER UPLOAD THESE
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+public_key.pem
+
+# Build outputs (except WebView2 SDK files needed for building)
+*.exe
+*.obj
+
+# WebView2 SDK files (needed for building) - KEEP THESE
+!WebView2Loader.dll
+!WebView2Loader.dll.lib  
+!WebView2LoaderStatic.lib
+!libWebView2Loader.a
+
+# Other library files
+*.dll
+*.lib
+*.a
+
+# WebView2 cache/data directories (auto-generated at runtime)
+*.WebView2/
+main.exe.WebView2/
+.webview2/
+*.so
+*.dylib
+
+# Debug files
+*.pdb
+*.ilk
+*.map
+*.exp
+
+# IDE files
+.vs/
+.vscode/settings.json
+.vscode/launch.json
+*.vcxproj.user
+*.suo
+*.user
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+out.txt
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# WebView2 runtime files
+*.WebView2/
+EBWebView/
+
+# Compiled libraries (keep templates)
+libgcc_s_seh-1.dll
+libstdc++-6.dll
+libwinpthread-1.dll
+
+# Archives
+*.rar
+*.zip
+*.7z
+*.tar.gz
+
+# Keep template files but not the actual config
+!config_defaults.cpp.template
+!*.template

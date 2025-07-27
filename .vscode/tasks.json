@@ -1,0 +1,41 @@
+{
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "C/C++: g++.exe build active file",
+            "command": "g++",
+            "args": [
+                "-fdiagnostics-color=always",
+                "-g",
+                "${workspaceFolder}/*.cpp",
+                "-o",
+                "${workspaceFolder}/main.exe",
+                "-lole32",
+                "-loleaut32",
+                "-lwbemuuid",
+                "-lwininet",
+                "-lssl",
+                "-lcrypto",
+                "-lbcrypt",
+                "-lcrypt32",
+                "-lgdi32",
+                "-L${workspaceFolder}",
+                "-lws2_32",
+                "-I${workspaceFolder}/include",
+                "${workspaceFolder}/WebView2Loader.dll.lib"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Build the application with all dependencies"
+        }
+    ],
+    "version": "2.0.0"
+}

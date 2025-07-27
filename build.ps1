@@ -1,0 +1,115 @@
+# Build script for MagicKeyRevC
+# Compiles the program and copies all required files to ./bin/
+
+Write-Host "Building MagicKeyRevC..." -ForegroundColor Green
+
+# Create bin directory if it doesn't exist
+if (!(Test-Path ".\bin")) {
+    New-Item -Path ".\bin" -ItemType Directory -Force | Out-Null
+    Write-Host "Created bin directory" -ForegroundColor Yellow
+}
+
+# Clean previous build
+Remove-Item ".\bin\*" -Force -Recurse -ErrorAction SilentlyContinue
+Write-Host "Cleaned bin directory" -ForegroundColor Yellow
+
+# Compile the program
+Write-Host "Compiling..." -ForegroundColor Yellow
+$compileCommand = @(
+    "C:\msys64\ucrt64\bin\g++.exe"
+    "-O2"  # Optimization for release
+    "-s"   # Strip symbols for smaller size
+    "-static-libgcc"
+    "-static-libstdc++"
+    "*.cpp"
+    "-o"
+    ".\bin\main.exe"
+    "-lole32"
+    "-loleaut32"
+    "-lwbemuuid"
+    "-lwininet"
+    "-lssl"
+    "-lcrypto"
+    "-lbcrypt"
+    "-lcrypt32"
+    "-lgdi32"
+    "-lws2_32"
+    "-L."
+    "-I.\include"
+    ".\WebView2Loader.dll.lib"
+)
+
+& $compileCommand[0] $compileCommand[1..($compileCommand.Length-1)]
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "Compilation successful!" -ForegroundColor Green
+    
+    # Copy required DLLs and libraries
+    Write-Host "Copying required files..." -ForegroundColor Yellow
+    
+    # WebView2 files
+    Copy-Item ".\WebView2Loader.dll" ".\bin\" -ErrorAction SilentlyContinue
+    Copy-Item ".\WebView2LoaderStatic.lib" ".\bin\" -ErrorAction SilentlyContinue
+    Copy-Item ".\libWebView2Loader.a" ".\bin\" -ErrorAction SilentlyContinue
+    
+    # Copy public key
+    Copy-Item ".\public_key.pem" ".\bin\" -ErrorAction SilentlyContinue
+    
+    # Copy MinGW runtime DLLs if they exist in the current directory
+    $mingwDlls = @(
+        "libgcc_s_seh-1.dll"
+        "libstdc++-6.dll"
+        "libwinpthread-1.dll"
+    )
+    
+    foreach ($dll in $mingwDlls) {
+        if (Test-Path ".\$dll") {
+            Copy-Item ".\$dll" ".\bin\"
+            Write-Host "Copied $dll" -ForegroundColor Cyan
+        }
+    }
+    
+    # Try to copy MinGW DLLs from MSYS2 installation
+    $msys2Path = "C:\msys64\ucrt64\bin"
+    if (Test-Path $msys2Path) {
+        foreach ($dll in $mingwDlls) {
+            if (Test-Path "$msys2Path\$dll") {
+                Copy-Item "$msys2Path\$dll" ".\bin\" -ErrorAction SilentlyContinue
+                Write-Host "Copied $dll from MSYS2" -ForegroundColor Cyan
+            }
+        }
+    }
+    
+    # Copy OpenSSL DLLs if available
+    $opensslDlls = @(
+        "libssl-3-x64.dll"
+        "libcrypto-3-x64.dll"
+    )
+    
+    foreach ($dll in $opensslDlls) {
+        if (Test-Path "$msys2Path\$dll") {
+            Copy-Item "$msys2Path\$dll" ".\bin\" -ErrorAction SilentlyContinue
+            Write-Host "Copied $dll from MSYS2" -ForegroundColor Cyan
+        }
+    }
+    
+    # Clean up WebView2 cache directories (not needed for distribution)
+    Remove-Item ".\bin\*.WebView2" -Force -Recurse -ErrorAction SilentlyContinue
+    Remove-Item ".\bin\.webview2" -Force -Recurse -ErrorAction SilentlyContinue
+    
+    Write-Host "`nBuild completed successfully!" -ForegroundColor Green
+    Write-Host "Executable and dependencies are in: .\bin\" -ForegroundColor Green
+    
+    # Show what's in the bin directory
+    Write-Host "`nFiles in bin directory:" -ForegroundColor Yellow
+    Get-ChildItem ".\bin" | ForEach-Object {
+        $size = if ($_.Length -gt 1MB) { "{0:N1} MB" -f ($_.Length / 1MB) } 
+                elseif ($_.Length -gt 1KB) { "{0:N1} KB" -f ($_.Length / 1KB) }
+                else { "$($_.Length) bytes" }
+        Write-Host "  $($_.Name) ($size)" -ForegroundColor Cyan
+    }
+    
+} else {
+    Write-Host "Compilation failed!" -ForegroundColor Red
+    exit 1
+}

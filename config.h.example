@@ -1,0 +1,80 @@
+#pragma once
+#include <string>
+
+// Compile-time configuration - edit these values directly
+namespace Config {
+    // URLs - Replace with your actual endpoints
+    static const std::string IPCHECK_URL = "https://your-ipcheck-service.com/";
+    static const std::string PROXYCHECK_URL = "https://your-proxy-check.com/v2/";
+    static const std::string BACKEND_URL = "https://your-backend-api.com/message";
+    static const std::string LOGIN_BASE_URL = "https://your-login-page.com/login";
+    
+    // Network Configuration
+    static const std::string USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) YourApp/1.0.0";
+    static const int TIMEOUT_MS = 30000;  // 30 seconds
+    static const int RETRY_ATTEMPTS = 3;
+    
+    // Security Settings
+    static const std::string PUBLIC_KEY_FILE = "public_key.pem";  // Place your RSA public key file here
+    static const bool DISABLE_DEVTOOLS = true;        // Disable F12 developer tools
+    static const bool DISABLE_CONTEXT_MENU = true;    // Disable right-click context menu
+    static const bool DISABLE_TEXT_SELECTION = true;  // Disable text selection
+    static const bool DISABLE_COPY_PASTE = true;      // Disable copy/paste functionality
+    
+    // Application Settings
+    static const std::string APP_VERSION = "1.0.0";
+    static const std::string APP_NAME = "YourAppName";
+    static const std::string DCID = "your-identifier";  // Your unique identifier
+    static const int WINDOW_WIDTH = 900;
+    static const int WINDOW_HEIGHT = 700;
+    
+    // Debug Settings - Set to true for development
+    static const bool DEBUG_ENABLED = false;
+    static const bool LOG_ENCRYPTED_DATA = false;     // Log encrypted data (security risk if true)
+    static const bool LOG_SERVER_RESPONSES = false;   // Log server responses
+    static const bool LOG_SYSTEM_INFO = false;        // Log system information
+}
+
+// Simple config class for backward compatibility
+class ConfigCompat {
+public:
+    std::string get_ipcheck_url() { return Config::IPCHECK_URL; }
+    std::string get_proxycheck_url() { return Config::PROXYCHECK_URL; }
+    std::string get_backend_url() { return Config::BACKEND_URL; }
+    std::string get_login_base_url() { return Config::LOGIN_BASE_URL; }
+    std::string get_user_agent() { return Config::USER_AGENT; }
+    std::string get_public_key_file() { return Config::PUBLIC_KEY_FILE; }
+    std::string get_app_version() { return Config::APP_VERSION; }
+    std::string get_app_name() { return Config::APP_NAME; }
+    std::string get_dcid() { return Config::DCID; }
+    int get_window_width() { return Config::WINDOW_WIDTH; }
+    int get_window_height() { return Config::WINDOW_HEIGHT; }
+    int get_timeout_ms() { return Config::TIMEOUT_MS; }
+    int get_retry_attempts() { return Config::RETRY_ATTEMPTS; }
+    bool is_debug_enabled() { return Config::DEBUG_ENABLED; }
+    bool should_log_encrypted_data() { return Config::LOG_ENCRYPTED_DATA; }
+    bool should_log_server_responses() { return Config::LOG_SERVER_RESPONSES; }
+    bool should_log_system_info() { return Config::LOG_SYSTEM_INFO; }
+    bool should_disable_devtools() { return Config::DISABLE_DEVTOOLS; }
+    bool should_disable_context_menu() { return Config::DISABLE_CONTEXT_MENU; }
+    bool should_disable_text_selection() { return Config::DISABLE_TEXT_SELECTION; }
+    bool should_disable_copy_paste() { return Config::DISABLE_COPY_PASTE; }
+};
+
+// Global config instance for backward compatibility
+extern ConfigCompat* g_config;
+
+// Initialize global config (no file needed)
+inline void init_config(const std::string& config_file = "") {
+    if (!g_config) {
+        g_config = new ConfigCompat();
+    }
+}
+
+// Cleanup global config
+inline void cleanup_config() {
+    if (g_config) {
+        delete g_config;
+        g_config = nullptr;
+    }
+}
