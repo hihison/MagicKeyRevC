@@ -43,7 +43,7 @@ EXAMPLE_KEY_REPLACE_WITH_ACTUAL_KEY
 #include <string>
 
 namespace EmbeddedKey {
-    static const std::string PUBLIC_KEY_PEM = R`($publicKeyContent)`;
+    static const std::string PUBLIC_KEY_PEM = R"($publicKeyContent)";
 }
 "@
 
@@ -158,6 +158,30 @@ if ($LASTEXITCODE -eq 0) {
                 elseif ($_.Length -gt 1KB) { "{0:N1} KB" -f ($_.Length / 1KB) }
                 else { "$($_.Length) bytes" }
         Write-Host "  $($_.Name) ($size)" -ForegroundColor Cyan
+    }
+    
+    # Create ZIP package for easy distribution
+    Write-Host "`nCreating ZIP package..." -ForegroundColor Yellow
+    $timestamp = Get-Date -Format "yyyyMMdd-HHmm"
+    $zipName = "MagicKeyRevC-v1.01C-$timestamp.zip"
+    $zipPath = ".\$zipName"
+    
+    # Remove existing ZIP if it exists
+    if (Test-Path $zipPath) {
+        Remove-Item $zipPath -Force
+    }
+    
+    # Create ZIP file with all bin contents
+    Compress-Archive -Path ".\bin\*" -DestinationPath $zipPath -CompressionLevel Optimal
+    
+    if (Test-Path $zipPath) {
+        $zipSize = (Get-Item $zipPath).Length
+        $zipSizeMB = [math]::Round($zipSize / 1MB, 2)
+        Write-Host "✓ ZIP package created: $zipName ($zipSizeMB MB)" -ForegroundColor Green
+        Write-Host "`nRelease package ready for distribution!" -ForegroundColor Green
+        Write-Host "Share this ZIP file - it contains everything needed to run the application." -ForegroundColor Cyan
+    } else {
+        Write-Host "✗ Failed to create ZIP package" -ForegroundColor Red
     }
     
 } else {

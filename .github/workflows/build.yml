@@ -330,6 +330,36 @@ jobs:
         echo "Dependencies of main.exe:"
         objdump -p dist/main.exe | grep "DLL Name" | head -20 || echo "Could not check dependencies"
     
+    - name: Create ZIP package for release
+      shell: bash
+      run: |
+        echo "Creating ZIP package for release..."
+        
+        # Get version info for ZIP name
+        APP_VERSION=$(grep -o 'APP_VERSION = "[^"]*"' config.h | cut -d'"' -f2 || echo "1.01C")
+        TIMESTAMP=$(date +'%Y%m%d-%H%M')
+        ZIP_NAME="MagicKeyRevC-v${APP_VERSION}-${TIMESTAMP}"
+        
+        echo "Creating ${ZIP_NAME}.zip"
+        
+        # Create ZIP file with all distribution files
+        cd dist
+        zip -r "../${ZIP_NAME}.zip" .
+        cd ..
+        
+        # Verify ZIP contents
+        echo "ZIP package contents:"
+        unzip -l "${ZIP_NAME}.zip"
+        
+        # Get ZIP file size
+        ZIP_SIZE=$(stat -c%s "${ZIP_NAME}.zip" 2>/dev/null || echo "unknown")
+        echo "ZIP package size: $ZIP_SIZE bytes"
+        
+        # Move ZIP to dist folder for release
+        mv "${ZIP_NAME}.zip" dist/
+        
+        echo "Release package ready: dist/${ZIP_NAME}.zip"
+    
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -389,16 +419,34 @@ jobs:
         tag_name: ${{ env.TAG_NAME }}
         name: ${{ env.RELEASE_NAME }}
         body: |
-          **Automated Release**
+          **📦 MagicKeyRevC Release Package**
           
-          Built from commit: ${{ github.sha }}
-          Branch: ${{ github.ref_name }}
+          **Download**: Get the complete ZIP package below - contains everything you need to run the application!
           
-          **Changes:**
-          - Latest build of MagicKeyRevC
-          - All dependencies included
-          - Ready to run executable
-        files: dist/*
+          **What's Included:**
+          - ✅ `main.exe` - Ready-to-run executable (embedded key, no .pem file needed)
+          - ✅ All required runtime DLLs (OpenSSL, MinGW, WebView2)
+          - ✅ Complete dependency package
+          
+          **System Requirements:**
+          - Windows 10/11 (x64)
+          - No additional installations required
+          
+          **Usage:**
+          1. Download the ZIP file
+          2. Extract to any folder
+          3. Run `main.exe`
+          
+          ---
+          **Build Info:**
+          - Built from commit: `${{ github.sha }}`
+          - Branch: `${{ github.ref_name }}`
+          - Version: MagicKeyRevC v1.01C
+          - Embedded encryption key: ✅ Included
+          
+        files: |
+          dist/*.zip
+          dist/main.exe
         draft: false
         prerelease: false
     
@@ -406,7 +454,9 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: dist/*
+        files: |
+          dist/*.zip
+          dist/main.exe
         draft: false
         prerelease: false
       env:
