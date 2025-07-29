@@ -28,6 +28,27 @@ jobs:
     
     - name: Create config.h from secrets
       shell: bash
+      env:
+        IPCHECK_URL: ${{ secrets.IPCHECK_URL || 'https://ipcheck.siu4.workers.dev/' }}
+        PROXYCHECK_URL: ${{ secrets.PROXYCHECK_URL || 'https://proxycheck.io/v2/' }}
+        BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://example.com/api' }}
+        LOGIN_BASE_URL: ${{ secrets.LOGIN_BASE_URL || 'https://example.com/login' }}
+        USER_AGENT: ${{ secrets.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) WebView2' }}
+        DCID: ${{ secrets.DCID || 'default' }}
+        APP_VERSION: ${{ secrets.APP_VERSION || '1.01C' }}
+        APP_NAME: ${{ secrets.APP_NAME || 'MagicKeyRevC' }}
+        TIMEOUT_MS: ${{ secrets.TIMEOUT_MS || '30000' }}
+        RETRY_ATTEMPTS: ${{ secrets.RETRY_ATTEMPTS || '3' }}
+        WINDOW_WIDTH: ${{ secrets.WINDOW_WIDTH || '900' }}
+        WINDOW_HEIGHT: ${{ secrets.WINDOW_HEIGHT || '700' }}
+        DISABLE_DEVTOOLS: ${{ secrets.DISABLE_DEVTOOLS || 'true' }}
+        DISABLE_CONTEXT_MENU: ${{ secrets.DISABLE_CONTEXT_MENU || 'true' }}
+        DISABLE_TEXT_SELECTION: ${{ secrets.DISABLE_TEXT_SELECTION || 'true' }}
+        DISABLE_COPY_PASTE: ${{ secrets.DISABLE_COPY_PASTE || 'true' }}
+        DEBUG_ENABLED: ${{ secrets.DEBUG_ENABLED || 'false' }}
+        LOG_ENCRYPTED_DATA: ${{ secrets.LOG_ENCRYPTED_DATA || 'false' }}
+        LOG_SERVER_RESPONSES: ${{ secrets.LOG_SERVER_RESPONSES || 'false' }}
+        LOG_SYSTEM_INFO: ${{ secrets.LOG_SYSTEM_INFO || 'false' }}
       run: |
         cat > config.h << 'EOF'
         #pragma once
@@ -36,35 +57,35 @@ jobs:
         // Compile-time configuration - edit these values directly
         namespace Config {
             // URLs
-            static const std::string IPCHECK_URL = "${{ secrets.IPCHECK_URL }}";
-            static const std::string PROXYCHECK_URL = "${{ secrets.PROXYCHECK_URL }}";
-            static const std::string BACKEND_URL = "${{ secrets.BACKEND_URL }}";
-            static const std::string LOGIN_BASE_URL = "${{ secrets.LOGIN_BASE_URL }}";
+            static const std::string IPCHECK_URL = "${IPCHECK_URL}";
+            static const std::string PROXYCHECK_URL = "${PROXYCHECK_URL}";
+            static const std::string BACKEND_URL = "${BACKEND_URL}";
+            static const std::string LOGIN_BASE_URL = "${LOGIN_BASE_URL}";
             
             // Network
-            static const std::string USER_AGENT = "${{ secrets.USER_AGENT }}";
-            static const int TIMEOUT_MS = ${{ secrets.TIMEOUT_MS || '30000' }};
-            static const int RETRY_ATTEMPTS = ${{ secrets.RETRY_ATTEMPTS || '3' }};
+            static const std::string USER_AGENT = "${USER_AGENT}";
+            static const int TIMEOUT_MS = ${TIMEOUT_MS};
+            static const int RETRY_ATTEMPTS = ${RETRY_ATTEMPTS};
             
             // Security
             static const std::string PUBLIC_KEY_FILE = "public_key.pem";
-            static const bool DISABLE_DEVTOOLS = ${{ secrets.DISABLE_DEVTOOLS || 'true' }};
-            static const bool DISABLE_CONTEXT_MENU = ${{ secrets.DISABLE_CONTEXT_MENU || 'true' }};
-            static const bool DISABLE_TEXT_SELECTION = ${{ secrets.DISABLE_TEXT_SELECTION || 'true' }};
-            static const bool DISABLE_COPY_PASTE = ${{ secrets.DISABLE_COPY_PASTE || 'true' }};
+            static const bool DISABLE_DEVTOOLS = ${DISABLE_DEVTOOLS};
+            static const bool DISABLE_CONTEXT_MENU = ${DISABLE_CONTEXT_MENU};
+            static const bool DISABLE_TEXT_SELECTION = ${DISABLE_TEXT_SELECTION};
+            static const bool DISABLE_COPY_PASTE = ${DISABLE_COPY_PASTE};
             
             // Application
-            static const std::string APP_VERSION = "${{ secrets.APP_VERSION || '1.01C' }}";
-            static const std::string APP_NAME = "${{ secrets.APP_NAME || 'MagicKeyRevC' }}";
-            static const std::string DCID = "${{ secrets.DCID }}";
-            static const int WINDOW_WIDTH = ${{ secrets.WINDOW_WIDTH || '900' }};
-            static const int WINDOW_HEIGHT = ${{ secrets.WINDOW_HEIGHT || '700' }};
+            static const std::string APP_VERSION = "${APP_VERSION}";
+            static const std::string APP_NAME = "${APP_NAME}";
+            static const std::string DCID = "${DCID}";
+            static const int WINDOW_WIDTH = ${WINDOW_WIDTH};
+            static const int WINDOW_HEIGHT = ${WINDOW_HEIGHT};
             
             // Debug
-            static const bool DEBUG_ENABLED = ${{ secrets.DEBUG_ENABLED || 'false' }};
-            static const bool LOG_ENCRYPTED_DATA = ${{ secrets.LOG_ENCRYPTED_DATA || 'false' }};
-            static const bool LOG_SERVER_RESPONSES = ${{ secrets.LOG_SERVER_RESPONSES || 'false' }};
-            static const bool LOG_SYSTEM_INFO = ${{ secrets.LOG_SYSTEM_INFO || 'false' }};
+            static const bool DEBUG_ENABLED = ${DEBUG_ENABLED};
+            static const bool LOG_ENCRYPTED_DATA = ${LOG_ENCRYPTED_DATA};
+            static const bool LOG_SERVER_RESPONSES = ${LOG_SERVER_RESPONSES};
+            static const bool LOG_SYSTEM_INFO = ${LOG_SYSTEM_INFO};
         }
 
         // Simple config class for backward compatibility
@@ -111,13 +132,35 @@ jobs:
             }
         }
         EOF
+        
+        # Replace environment variables in the file
+        envsubst < config.h > config.h.tmp && mv config.h.tmp config.h
     
     - name: Create public_key.pem from secrets
       shell: bash
+      env:
+        PUBLIC_KEY_PEM: ${{ secrets.PUBLIC_KEY_PEM }}
       run: |
-        cat > public_key.pem << 'EOF'
-        ${{ secrets.PUBLIC_KEY_PEM }}
-        EOF
+        if [ -n "$PUBLIC_KEY_PEM" ]; then
+          echo "$PUBLIC_KEY_PEM" > public_key.pem
+        else
+          echo "Warning: PUBLIC_KEY_PEM secret not set, using example or creating dummy"
+          if [ -f "public_key.pem.example" ]; then
+            cp public_key.pem.example public_key.pem
+          else
+            cat > public_key.pem << 'EOF'
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7Q8n9q9JGJ7Q8n9q9JGJ
+7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n
+9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9J
+GJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q
+8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q
+9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ
+QIDAQAB
+-----END PUBLIC KEY-----
+EOF
+          fi
+        fi
     
     - name: Build application
       shell: msys2 {0}
