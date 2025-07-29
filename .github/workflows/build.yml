@@ -236,16 +236,52 @@ jobs:
         cp WebView2LoaderStatic.lib dist/ && echo "✓ Copied WebView2LoaderStatic.lib" || echo "✗ Failed to copy WebView2LoaderStatic.lib"
         cp libWebView2Loader.a dist/ && echo "✓ Copied libWebView2Loader.a" || echo "✗ Failed to copy libWebView2Loader.a"
         
+        # Find the correct MSYS2 paths first
+        echo "Locating MSYS2 DLL paths..."
+        MSYS2_BIN=""
+        for path in "/ucrt64/bin" "/mingw64/bin" "/usr/bin" "C:/msys64/ucrt64/bin" "C:/msys64/mingw64/bin"; do
+          if [ -d "$path" ] && [ -f "$path/libgcc_s_seh-1.dll" ]; then
+            MSYS2_BIN="$path"
+            echo "Found MSYS2 binaries at: $MSYS2_BIN"
+            break
+          fi
+        done
+        
+        if [ -z "$MSYS2_BIN" ]; then
+          echo "Searching for MinGW DLLs in common locations..."
+          find /c/msys64 -name "libgcc_s_seh-1.dll" 2>/dev/null | head -5
+          find /d/a/_temp/msys64 -name "libgcc_s_seh-1.dll" 2>/dev/null | head -5
+          find /mingw64 -name "libgcc_s_seh-1.dll" 2>/dev/null | head -5
+          
+          # Try alternative paths that might exist in GitHub Actions
+          for alt_path in "/d/a/_temp/msys64/ucrt64/bin" "/c/msys64/ucrt64/bin" "/msys64/ucrt64/bin"; do
+            if [ -d "$alt_path" ] && [ -f "$alt_path/libgcc_s_seh-1.dll" ]; then
+              MSYS2_BIN="$alt_path"
+              echo "Found alternative MSYS2 path: $MSYS2_BIN"
+              break
+            fi
+          done
+        fi
+        
+        if [ -z "$MSYS2_BIN" ]; then
+          echo "ERROR: Could not locate MSYS2 binary directory!"
+          echo "Available paths:"
+          ls -la /ucrt64/ 2>/dev/null || echo "No /ucrt64/"
+          ls -la /mingw64/ 2>/dev/null || echo "No /mingw64/"
+          ls -la /c/msys64/ 2>/dev/null || echo "No /c/msys64/"
+          exit 1
+        fi
+        
         # Copy MinGW runtime DLLs (must match local build exactly)
-        echo "Copying MinGW runtime DLLs..."
-        cp /ucrt64/bin/libgcc_s_seh-1.dll dist/ && echo "✓ Copied libgcc_s_seh-1.dll" || echo "✗ Failed to copy libgcc_s_seh-1.dll"
-        cp /ucrt64/bin/libstdc++-6.dll dist/ && echo "✓ Copied libstdc++-6.dll" || echo "✗ Failed to copy libstdc++-6.dll"
-        cp /ucrt64/bin/libwinpthread-1.dll dist/ && echo "✓ Copied libwinpthread-1.dll" || echo "✗ Failed to copy libwinpthread-1.dll"
+        echo "Copying MinGW runtime DLLs from $MSYS2_BIN..."
+        cp "$MSYS2_BIN/libgcc_s_seh-1.dll" dist/ && echo "✓ Copied libgcc_s_seh-1.dll" || echo "✗ Failed to copy libgcc_s_seh-1.dll"
+        cp "$MSYS2_BIN/libstdc++-6.dll" dist/ && echo "✓ Copied libstdc++-6.dll" || echo "✗ Failed to copy libstdc++-6.dll"
+        cp "$MSYS2_BIN/libwinpthread-1.dll" dist/ && echo "✓ Copied libwinpthread-1.dll" || echo "✗ Failed to copy libwinpthread-1.dll"
         
         # Copy OpenSSL DLLs (must match local build exactly)
-        echo "Copying OpenSSL DLLs..."
-        cp /ucrt64/bin/libssl-3-x64.dll dist/ && echo "✓ Copied libssl-3-x64.dll" || echo "✗ Failed to copy libssl-3-x64.dll"
-        cp /ucrt64/bin/libcrypto-3-x64.dll dist/ && echo "✓ Copied libcrypto-3-x64.dll" || echo "✗ Failed to copy libcrypto-3-x64.dll"
+        echo "Copying OpenSSL DLLs from $MSYS2_BIN..."
+        cp "$MSYS2_BIN/libssl-3-x64.dll" dist/ && echo "✓ Copied libssl-3-x64.dll" || echo "✗ Failed to copy libssl-3-x64.dll"
+        cp "$MSYS2_BIN/libcrypto-3-x64.dll" dist/ && echo "✓ Copied libcrypto-3-x64.dll" || echo "✗ Failed to copy libcrypto-3-x64.dll"
         
         # Note: embedded_key.h is compiled into the executable, no separate .pem file needed
         
@@ -279,6 +315,10 @@ jobs:
         else
           echo "❌ Missing files: ${missing_files[*]}"
           echo "Distribution is incomplete!"
+          
+          # Debug: List what's actually available
+          echo "Debug: Available DLLs in $MSYS2_BIN:"
+          ls -la "$MSYS2_BIN"/lib*.dll 2>/dev/null | head -10
           exit 1
         fi
         
