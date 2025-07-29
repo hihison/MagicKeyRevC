@@ -10,6 +10,9 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write
+      actions: read
     
     steps:
     - name: Checkout code
@@ -200,10 +203,15 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # Create and push tag
+        # Configure git with token authentication
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Create tag
         git tag ${{ steps.datetime.outputs.tag }}
+        
+        # Push tag using token authentication
+        git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
         git push origin ${{ steps.datetime.outputs.tag }}
         
         echo "Created tag: ${{ steps.datetime.outputs.tag }}"
