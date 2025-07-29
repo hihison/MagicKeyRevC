@@ -29,6 +29,17 @@ jobs:
           mingw-w64-ucrt-x86_64-pkg-config
           make
     
+    - name: Install additional dependencies
+      shell: bash
+      run: |
+        # Ensure we have latest packages and essential Windows dependencies
+        echo "Installing additional dependencies..."
+        
+        # Check what Visual C++ redistributables are available
+        echo "Available VC++ redistributables:"
+        ls -la "/c/Program Files/Microsoft Visual Studio/" 2>/dev/null || echo "Visual Studio not found"
+        ls -la "/c/Program Files (x86)/Microsoft Visual Studio/" 2>/dev/null || echo "Visual Studio x86 not found"
+    
     - name: Create config.h from secrets
       shell: bash
       run: |
@@ -172,6 +183,7 @@ jobs:
       shell: msys2 {0}
       run: |
         echo "Starting compilation..."
+        # Use more robust linking to match local build
         g++ -O2 -s -static-libgcc -static-libstdc++ *.cpp \
           -o main.exe \
           -lole32 -loleaut32 -lwbemuuid -lwininet \
@@ -183,6 +195,10 @@ jobs:
         if [ -f "main.exe" ]; then
           echo "main.exe created successfully"
           ls -la main.exe
+          
+          # Check dependencies
+          echo "Checking dependencies:"
+          objdump -p main.exe | grep "DLL Name" | head -20 || echo "Could not check dependencies"
         else
           echo "Error: main.exe not found after compilation"
           exit 1
@@ -211,9 +227,23 @@ jobs:
         cp /ucrt64/bin/libssl-3-x64.dll dist/ && echo "Copied libssl-3-x64.dll" || echo "Warning: libssl-3-x64.dll not found"
         cp /ucrt64/bin/libcrypto-3-x64.dll dist/ && echo "Copied libcrypto-3-x64.dll" || echo "Warning: libcrypto-3-x64.dll not found"
         
+        # Copy additional runtime dependencies that might be needed
+        echo "Copying additional runtime dependencies..."
+        
+        # Try to copy UCRT DLLs (Universal C Runtime)
+        for dll in api-ms-win-crt-*.dll ucrtbase.dll vcruntime*.dll msvcp*.dll; do
+          if [ -f "/c/Windows/System32/$dll" ]; then
+            cp "/c/Windows/System32/$dll" dist/ && echo "Copied $dll" || true
+          fi
+        done
+        
         # List what we actually copied
         echo "Files in distribution package:"
         ls -la dist/
+        
+        # Check dependencies of the built executable
+        echo "Dependencies of main.exe:"
+        objdump -p dist/main.exe | grep "DLL Name" | head -20 || echo "Could not check dependencies"
     
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
