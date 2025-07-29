@@ -1,7 +1,40 @@
 # Build script for MagicKeyRevC
 # Compiles the program and copies all required files to ./bin/
+# Supports both static and dynamic linking
 
-Write-Host "Building MagicKeyRevC..." -ForegroundColor Green
+param(
+    [switch]$Static = $false,
+    [switch]$Help = $false
+)
+
+if ($Help) {
+    Write-Host @"
+MagicKeyRevC Build Script
+
+Usage:
+  .\build.ps1              - Build with DLL dependencies (smaller file, requires DLLs)
+  .\build.ps1 -Static      - Build single executable (larger file, no DLLs needed)
+  .\build.ps1 -Help        - Show this help
+
+Static Build:
+  - Creates a single .exe file with all libraries embedded
+  - No external DLLs required
+  - Larger file size (~10-20MB)
+  - Maximum portability - run anywhere
+
+Dynamic Build:
+  - Smaller .exe file (~1-2MB)
+  - Requires separate DLL files
+  - All dependencies copied to bin folder
+"@ -ForegroundColor Cyan
+    exit 0
+}
+
+if ($Static) {
+    Write-Host "Building MagicKeyRevC (STATIC - Single Executable)..." -ForegroundColor Green
+} else {
+    Write-Host "Building MagicKeyRevC (DYNAMIC - with DLLs)..." -ForegroundColor Green
+}
 
 # Create bin directory if it doesn't exist
 if (!(Test-Path ".\bin")) {
@@ -53,94 +86,146 @@ namespace EmbeddedKey {
 
 # Compile the program
 Write-Host "Compiling..." -ForegroundColor Yellow
-$compileCommand = @(
-    "C:\msys64\ucrt64\bin\g++.exe"
-    "-O2"  # Optimization for release
-    "-s"   # Strip symbols for smaller size
-    "-static-libgcc"
-    "-static-libstdc++"
-    "*.cpp"
-    "-o"
-    ".\bin\main.exe"
-    "-lole32"
-    "-loleaut32"
-    "-lwbemuuid"
-    "-lwininet"
-    "-lssl"
-    "-lcrypto"
-    "-lbcrypt"
-    "-lcrypt32"
-    "-lgdi32"
-    "-lws2_32"
-    "-L."
-    "-I.\include"
-    ".\WebView2Loader.dll.lib"
-)
+
+if ($Static) {
+    Write-Host "Using static linking (single executable)..." -ForegroundColor Cyan
+    $compileCommand = @(
+        "C:\msys64\ucrt64\bin\g++.exe"
+        "-O2"  # Optimization for release
+        "-s"   # Strip symbols for smaller size
+        "-static"  # Static linking
+        "-static-libgcc"
+        "-static-libstdc++"
+        "*.cpp"
+        "-o"
+        ".\bin\main.exe"
+        "-lole32"
+        "-loleaut32"
+        "-lwbemuuid"
+        "-lwininet"
+        "-Wl,-Bstatic"
+        "-lssl"
+        "-lcrypto"
+        "-Wl,-Bdynamic"
+        "-lbcrypt"
+        "-lcrypt32"
+        "-lgdi32"
+        "-lws2_32"
+        "-L."
+        "-I.\include"
+        ".\WebView2LoaderStatic.lib"
+    )
+} else {
+    Write-Host "Using dynamic linking (with DLLs)..." -ForegroundColor Cyan
+    $compileCommand = @(
+        "C:\msys64\ucrt64\bin\g++.exe"
+        "-O2"  # Optimization for release
+        "-s"   # Strip symbols for smaller size
+        "-static-libgcc"
+        "-static-libstdc++"
+        "*.cpp"
+        "-o"
+        ".\bin\main.exe"
+        "-lole32"
+        "-loleaut32"
+        "-lwbemuuid"
+        "-lwininet"
+        "-lssl"
+        "-lcrypto"
+        "-lbcrypt"
+        "-lcrypt32"
+        "-lgdi32"
+        "-lws2_32"
+        "-L."
+        "-I.\include"
+        ".\WebView2Loader.dll.lib"
+    )
+}
 
 & $compileCommand[0] $compileCommand[1..($compileCommand.Length-1)]
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Compilation successful!" -ForegroundColor Green
     
-    # Copy required DLLs and libraries
-    Write-Host "Copying required files..." -ForegroundColor Yellow
-    
-    # WebView2 files
-    Copy-Item ".\WebView2Loader.dll" ".\bin\" -ErrorAction SilentlyContinue
-    Copy-Item ".\WebView2LoaderStatic.lib" ".\bin\" -ErrorAction SilentlyContinue
-    Copy-Item ".\libWebView2Loader.a" ".\bin\" -ErrorAction SilentlyContinue
-    
-    # Note: public_key.pem is now embedded in the executable, not needed as separate file
-    
-    # Copy MinGW runtime DLLs if they exist in the current directory
-    $mingwDlls = @(
-        "libgcc_s_seh-1.dll"
-        "libstdc++-6.dll"
-        "libwinpthread-1.dll"
-    )
-    
-    foreach ($dll in $mingwDlls) {
-        if (Test-Path ".\$dll") {
-            Copy-Item ".\$dll" ".\bin\"
-            Write-Host "Copied $dll" -ForegroundColor Cyan
+    if ($Static) {
+        Write-Host "Static build complete - single executable created!" -ForegroundColor Green
+        Write-Host "No DLL files needed - the executable is self-contained." -ForegroundColor Cyan
+        
+        # Check if the executable has any external dependencies
+        Write-Host "Checking dependencies..." -ForegroundColor Yellow
+        try {
+            $deps = & "C:\msys64\ucrt64\bin\objdump.exe" -p ".\bin\main.exe" | Select-String "DLL Name"
+            if ($deps) {
+                Write-Host "External dependencies found:" -ForegroundColor Yellow
+                $deps | ForEach-Object { Write-Host "  $_" -ForegroundColor Cyan }
+            } else {
+                Write-Host "✅ No external DLL dependencies - fully static!" -ForegroundColor Green
+            }
+        } catch {
+            Write-Host "Could not check dependencies (objdump not available)" -ForegroundColor Yellow
         }
-    }
-    
-    # Try to copy MinGW DLLs from MSYS2 installation
-    $msys2Path = "C:\msys64\ucrt64\bin"
-    if (Test-Path $msys2Path) {
+        
+    } else {
+        # Copy required DLLs and libraries for dynamic build
+        Write-Host "Copying required files for dynamic build..." -ForegroundColor Yellow
+        
+        # WebView2 files
+        Copy-Item ".\WebView2Loader.dll" ".\bin\" -ErrorAction SilentlyContinue
+        Copy-Item ".\WebView2LoaderStatic.lib" ".\bin\" -ErrorAction SilentlyContinue
+        Copy-Item ".\libWebView2Loader.a" ".\bin\" -ErrorAction SilentlyContinue
+        
+        # Note: public_key.pem is now embedded in the executable, not needed as separate file
+        
+        # Copy MinGW runtime DLLs if they exist in the current directory
+        $mingwDlls = @(
+            "libgcc_s_seh-1.dll"
+            "libstdc++-6.dll"
+            "libwinpthread-1.dll"
+        )
+        
         foreach ($dll in $mingwDlls) {
+            if (Test-Path ".\$dll") {
+                Copy-Item ".\$dll" ".\bin\"
+                Write-Host "Copied $dll" -ForegroundColor Cyan
+            }
+        }
+        
+        # Try to copy MinGW DLLs from MSYS2 installation
+        $msys2Path = "C:\msys64\ucrt64\bin"
+        if (Test-Path $msys2Path) {
+            foreach ($dll in $mingwDlls) {
+                if (Test-Path "$msys2Path\$dll") {
+                    Copy-Item "$msys2Path\$dll" ".\bin\" -ErrorAction SilentlyContinue
+                    Write-Host "Copied $dll from MSYS2" -ForegroundColor Cyan
+                }
+            }
+        }
+        
+        # Copy OpenSSL DLLs if available
+        $opensslDlls = @(
+            "libssl-3-x64.dll"
+            "libcrypto-3-x64.dll"
+        )
+        
+        Write-Host "Copying OpenSSL DLLs..." -ForegroundColor Yellow
+        foreach ($dll in $opensslDlls) {
             if (Test-Path "$msys2Path\$dll") {
                 Copy-Item "$msys2Path\$dll" ".\bin\" -ErrorAction SilentlyContinue
                 Write-Host "Copied $dll from MSYS2" -ForegroundColor Cyan
+            } else {
+                Write-Host "Warning: $dll not found in $msys2Path" -ForegroundColor Red
             }
         }
-    }
-    
-    # Copy OpenSSL DLLs if available
-    $opensslDlls = @(
-        "libssl-3-x64.dll"
-        "libcrypto-3-x64.dll"
-    )
-    
-    Write-Host "Copying OpenSSL DLLs..." -ForegroundColor Yellow
-    foreach ($dll in $opensslDlls) {
-        if (Test-Path "$msys2Path\$dll") {
-            Copy-Item "$msys2Path\$dll" ".\bin\" -ErrorAction SilentlyContinue
-            Write-Host "Copied $dll from MSYS2" -ForegroundColor Cyan
-        } else {
-            Write-Host "Warning: $dll not found in $msys2Path" -ForegroundColor Red
-        }
-    }
-    
-    # Verify critical dependencies are present
-    Write-Host "Verifying critical dependencies..." -ForegroundColor Yellow
-    $criticalDlls = @("libcrypto-3-x64.dll", "libssl-3-x64.dll", "WebView2Loader.dll")
-    foreach ($dll in $criticalDlls) {
-        if (Test-Path ".\bin\$dll") {
-            Write-Host "✓ $dll present" -ForegroundColor Green
-        } else {
-            Write-Host "✗ $dll MISSING!" -ForegroundColor Red
+        
+        # Verify critical dependencies are present
+        Write-Host "Verifying critical dependencies..." -ForegroundColor Yellow
+        $criticalDlls = @("libcrypto-3-x64.dll", "libssl-3-x64.dll", "WebView2Loader.dll")
+        foreach ($dll in $criticalDlls) {
+            if (Test-Path ".\bin\$dll") {
+                Write-Host "✓ $dll present" -ForegroundColor Green
+            } else {
+                Write-Host "✗ $dll MISSING!" -ForegroundColor Red
+            }
         }
     }
     
@@ -149,39 +234,41 @@ if ($LASTEXITCODE -eq 0) {
     Remove-Item ".\bin\.webview2" -Force -Recurse -ErrorAction SilentlyContinue
     
     Write-Host "`nBuild completed successfully!" -ForegroundColor Green
-    Write-Host "Executable and dependencies are in: .\bin\" -ForegroundColor Green
+    
+    if ($Static) {
+        Write-Host "🎉 STATIC BUILD: Single executable created!" -ForegroundColor Green
+        Write-Host "📁 Location: .\bin\main.exe" -ForegroundColor Green
+        Write-Host "✅ No DLLs required - fully portable!" -ForegroundColor Cyan
+        Write-Host "📦 You can distribute just the main.exe file" -ForegroundColor Cyan
+    } else {
+        Write-Host "🎉 DYNAMIC BUILD: Executable and dependencies created!" -ForegroundColor Green
+        Write-Host "📁 Location: .\bin\" -ForegroundColor Green
+        Write-Host "📦 Distribute all files in the bin folder together" -ForegroundColor Cyan
+    }
     
     # Show what's in the bin directory
     Write-Host "`nFiles in bin directory:" -ForegroundColor Yellow
+    $totalSize = 0
     Get-ChildItem ".\bin" | ForEach-Object {
+        $totalSize += $_.Length
         $size = if ($_.Length -gt 1MB) { "{0:N1} MB" -f ($_.Length / 1MB) } 
                 elseif ($_.Length -gt 1KB) { "{0:N1} KB" -f ($_.Length / 1KB) }
                 else { "$($_.Length) bytes" }
-        Write-Host "  $($_.Name) ($size)" -ForegroundColor Cyan
+        
+        if ($_.Name -eq "main.exe") {
+            Write-Host "  🎯 $($_.Name) ($size)" -ForegroundColor Green
+        } else {
+            Write-Host "  📄 $($_.Name) ($size)" -ForegroundColor Cyan
+        }
     }
     
-    # Create ZIP package for easy distribution
-    Write-Host "`nCreating ZIP package..." -ForegroundColor Yellow
-    $timestamp = Get-Date -Format "yyyyMMdd-HHmm"
-    $zipName = "MagicKeyRevC-v1.01C-$timestamp.zip"
-    $zipPath = ".\$zipName"
+    $totalSizeMB = $totalSize / 1MB
+    Write-Host "`nTotal package size: {0:N1} MB" -f $totalSizeMB -ForegroundColor Yellow
     
-    # Remove existing ZIP if it exists
-    if (Test-Path $zipPath) {
-        Remove-Item $zipPath -Force
-    }
-    
-    # Create ZIP file with all bin contents
-    Compress-Archive -Path ".\bin\*" -DestinationPath $zipPath -CompressionLevel Optimal
-    
-    if (Test-Path $zipPath) {
-        $zipSize = (Get-Item $zipPath).Length
-        $zipSizeMB = [math]::Round($zipSize / 1MB, 2)
-        Write-Host "✓ ZIP package created: $zipName ($zipSizeMB MB)" -ForegroundColor Green
-        Write-Host "`nRelease package ready for distribution!" -ForegroundColor Green
-        Write-Host "Share this ZIP file - it contains everything needed to run the application." -ForegroundColor Cyan
+    if ($Static) {
+        Write-Host "`n💡 To build with DLLs instead: .\build.ps1" -ForegroundColor DarkGray
     } else {
-        Write-Host "✗ Failed to create ZIP package" -ForegroundColor Red
+        Write-Host "`n💡 To build single executable: .\build.ps1 -Static" -ForegroundColor DarkGray
     }
     
 } else {
