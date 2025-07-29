@@ -29,44 +29,106 @@ jobs:
     - name: Create config.h from secrets
       shell: bash
       run: |
-        # Ensure we have a base config.h file
-        if [ ! -f "config.h" ]; then
-          if [ -f "config.h.example" ]; then
-            echo "Using config.h.example as base"
-            cp config.h.example config.h
-          else
-            echo "No config.h found, build will use existing files"
-          fi
+        # Always create a fresh config.h to avoid secret masking issues
+        echo "Creating clean config.h file"
+        
+        # Create base config with echo commands to avoid YAML issues
+        echo '#pragma once' > config.h
+        echo '#include <string>' >> config.h
+        echo '' >> config.h
+        echo 'namespace Config {' >> config.h
+        echo '    static const std::string IPCHECK_URL = "https://ipcheck.siu4.workers.dev/";' >> config.h
+        echo '    static const std::string PROXYCHECK_URL = "https://proxycheck.io/v2/";' >> config.h
+        
+        # Add BACKEND_URL (with secret if available)
+        if [ "${{ github.event_name }}" != "pull_request" ] && [ -n "${{ secrets.BACKEND_URL }}" ]; then
+          echo "    static const std::string BACKEND_URL = \"${{ secrets.BACKEND_URL }}\";" >> config.h
+        else
+          echo '    static const std::string BACKEND_URL = "https://example.com/api";' >> config.h
         fi
         
-        # Apply secrets if available and not a PR
-        if [ "${{ github.event_name }}" != "pull_request" ] && [ -n "${{ secrets.BACKEND_URL }}" ]; then
-          echo "Applying secrets to config.h"
-          
-          # Only make backup if file exists
-          if [ -f "config.h" ]; then
-            cp config.h config.h.backup
-            
-            # Replace key values if secrets are provided
-            if [ -n "${{ secrets.BACKEND_URL }}" ]; then
-              sed -i 's|static const std::string BACKEND_URL = "[^"]*"|static const std::string BACKEND_URL = "${{ secrets.BACKEND_URL }}"|' config.h
-            fi
-            
-            if [ -n "${{ secrets.DCID }}" ]; then
-              sed -i 's|static const std::string DCID = "[^"]*"|static const std::string DCID = "${{ secrets.DCID }}"|' config.h
-            fi
-            
-            if [ -n "${{ secrets.LOGIN_BASE_URL }}" ]; then
-              sed -i 's|static const std::string LOGIN_BASE_URL = "[^"]*"|static const std::string LOGIN_BASE_URL = "${{ secrets.LOGIN_BASE_URL }}"|' config.h
-            fi
-            
-            if [ -n "${{ secrets.USER_AGENT }}" ]; then
-              sed -i 's|static const std::string USER_AGENT = "[^"]*"|static const std::string USER_AGENT = "${{ secrets.USER_AGENT }}"|' config.h
-            fi
-          fi
+        # Add LOGIN_BASE_URL (with secret if available)
+        if [ "${{ github.event_name }}" != "pull_request" ] && [ -n "${{ secrets.LOGIN_BASE_URL }}" ]; then
+          echo "    static const std::string LOGIN_BASE_URL = \"${{ secrets.LOGIN_BASE_URL }}\";" >> config.h
         else
-          echo "Using default config.h (no secrets applied)"
+          echo '    static const std::string LOGIN_BASE_URL = "https://example.com/login";' >> config.h
         fi
+        
+        # Add USER_AGENT (with secret if available)
+        if [ "${{ github.event_name }}" != "pull_request" ] && [ -n "${{ secrets.USER_AGENT }}" ]; then
+          echo "    static const std::string USER_AGENT = \"${{ secrets.USER_AGENT }}\";" >> config.h
+        else
+          echo '    static const std::string USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) WebView2";' >> config.h
+        fi
+        
+        echo '    static const int TIMEOUT_MS = 30000;' >> config.h
+        echo '    static const int RETRY_ATTEMPTS = 3;' >> config.h
+        echo '    static const std::string PUBLIC_KEY_FILE = "public_key.pem";' >> config.h
+        echo '    static const bool DISABLE_DEVTOOLS = true;' >> config.h
+        echo '    static const bool DISABLE_CONTEXT_MENU = true;' >> config.h
+        echo '    static const bool DISABLE_TEXT_SELECTION = true;' >> config.h
+        echo '    static const bool DISABLE_COPY_PASTE = true;' >> config.h
+        echo '    static const std::string APP_VERSION = "1.01C";' >> config.h
+        echo '    static const std::string APP_NAME = "MagicKeyRevC";' >> config.h
+        
+        # Add DCID (with secret if available)
+        if [ "${{ github.event_name }}" != "pull_request" ] && [ -n "${{ secrets.DCID }}" ]; then
+          echo "    static const std::string DCID = \"${{ secrets.DCID }}\";" >> config.h
+        else
+          echo '    static const std::string DCID = "default";' >> config.h
+        fi
+        
+        echo '    static const int WINDOW_WIDTH = 900;' >> config.h
+        echo '    static const int WINDOW_HEIGHT = 700;' >> config.h
+        echo '    static const bool DEBUG_ENABLED = false;' >> config.h
+        echo '    static const bool LOG_ENCRYPTED_DATA = false;' >> config.h
+        echo '    static const bool LOG_SERVER_RESPONSES = false;' >> config.h
+        echo '    static const bool LOG_SYSTEM_INFO = false;' >> config.h
+        echo '}' >> config.h
+        echo '' >> config.h
+        
+        # Add compatibility class (simpler approach)
+        echo 'class ConfigCompat {' >> config.h
+        echo 'public:' >> config.h
+        echo '    std::string get_ipcheck_url() { return Config::IPCHECK_URL; }' >> config.h
+        echo '    std::string get_proxycheck_url() { return Config::PROXYCHECK_URL; }' >> config.h
+        echo '    std::string get_backend_url() { return Config::BACKEND_URL; }' >> config.h
+        echo '    std::string get_login_base_url() { return Config::LOGIN_BASE_URL; }' >> config.h
+        echo '    std::string get_user_agent() { return Config::USER_AGENT; }' >> config.h
+        echo '    std::string get_public_key_file() { return Config::PUBLIC_KEY_FILE; }' >> config.h
+        echo '    std::string get_app_version() { return Config::APP_VERSION; }' >> config.h
+        echo '    std::string get_app_name() { return Config::APP_NAME; }' >> config.h
+        echo '    std::string get_dcid() { return Config::DCID; }' >> config.h
+        echo '    int get_window_width() { return Config::WINDOW_WIDTH; }' >> config.h
+        echo '    int get_window_height() { return Config::WINDOW_HEIGHT; }' >> config.h
+        echo '    int get_timeout_ms() { return Config::TIMEOUT_MS; }' >> config.h
+        echo '    int get_retry_attempts() { return Config::RETRY_ATTEMPTS; }' >> config.h
+        echo '    bool is_debug_enabled() { return Config::DEBUG_ENABLED; }' >> config.h
+        echo '    bool should_log_encrypted_data() { return Config::LOG_ENCRYPTED_DATA; }' >> config.h
+        echo '    bool should_log_server_responses() { return Config::LOG_SERVER_RESPONSES; }' >> config.h
+        echo '    bool should_log_system_info() { return Config::LOG_SYSTEM_INFO; }' >> config.h
+        echo '    bool should_disable_devtools() { return Config::DISABLE_DEVTOOLS; }' >> config.h
+        echo '    bool should_disable_context_menu() { return Config::DISABLE_CONTEXT_MENU; }' >> config.h
+        echo '    bool should_disable_text_selection() { return Config::DISABLE_TEXT_SELECTION; }' >> config.h
+        echo '    bool should_disable_copy_paste() { return Config::DISABLE_COPY_PASTE; }' >> config.h
+        echo '};' >> config.h
+        echo '' >> config.h
+        echo 'extern ConfigCompat* g_config;' >> config.h
+        echo '' >> config.h
+        echo 'inline void init_config(const std::string& config_file = "") {' >> config.h
+        echo '    if (!g_config) {' >> config.h
+        echo '        g_config = new ConfigCompat();' >> config.h
+        echo '    }' >> config.h
+        echo '}' >> config.h
+        echo '' >> config.h
+        echo 'inline void cleanup_config() {' >> config.h
+        echo '    if (g_config) {' >> config.h
+        echo '        delete g_config;' >> config.h
+        echo '        g_config = nullptr;' >> config.h
+        echo '    }' >> config.h
+        echo '}' >> config.h
+        
+        echo "Config.h created successfully"
     
     - name: Create public_key.pem from secrets
       shell: bash
