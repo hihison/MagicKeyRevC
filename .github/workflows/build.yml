@@ -296,6 +296,7 @@ jobs:
     - name: Get current date and time
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       id: datetime
+      shell: bash
       run: |
         echo "tag=v$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
         echo "name=MagicKeyRevC-$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
@@ -305,21 +306,27 @@ jobs:
       shell: bash
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TAG_NAME: ${{ steps.datetime.outputs.tag }}
+        REPO_NAME: ${{ github.repository }}
       run: |
         # Configure git with token authentication
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         
+        # Debug: Show what we're working with
+        echo "Creating tag: ${TAG_NAME}"
+        echo "Repository: ${REPO_NAME}"
+        
         # Create tag
-        git tag ${{ steps.datetime.outputs.tag }}
+        git tag "${TAG_NAME}"
         
         # Push tag using token authentication
-        git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-        git push origin ${{ steps.datetime.outputs.tag }}
+        git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_NAME}.git"
+        git push origin "${TAG_NAME}"
         
         # Verify tag was created successfully
-        if git ls-remote --tags origin | grep -q "${{ steps.datetime.outputs.tag }}"; then
-          echo "Tag ${{ steps.datetime.outputs.tag }} successfully created and pushed"
+        if git ls-remote --tags origin | grep -q "${TAG_NAME}"; then
+          echo "Tag ${TAG_NAME} successfully created and pushed"
           echo "tag_created=true" >> $GITHUB_OUTPUT
         else
           echo "Failed to create or push tag"
@@ -330,9 +337,13 @@ jobs:
     - name: Create Release
       if: github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.create_tag.outputs.tag_created == 'true'
       uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TAG_NAME: ${{ steps.datetime.outputs.tag }}
+        RELEASE_NAME: ${{ steps.datetime.outputs.name }}
       with:
-        tag_name: ${{ steps.datetime.outputs.tag }}
-        name: ${{ steps.datetime.outputs.name }}
+        tag_name: ${{ env.TAG_NAME }}
+        name: ${{ env.RELEASE_NAME }}
         body: |
           **Automated Release**
           
@@ -346,8 +357,6 @@ jobs:
         files: dist/*
         draft: false
         prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Create Release (on manual tag)
       if: startsWith(github.ref, 'refs/tags/')
