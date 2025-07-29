@@ -180,6 +180,9 @@ void ShowWebView2(const std::wstring& url) {
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = GetModuleHandleW(nullptr);
     wc.lpszClassName = CLASS_NAME;
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.style = CS_HREDRAW | CS_VREDRAW;
     RegisterClassW(&wc);
 
     std::string app_name = g_config ? g_config->get_app_name() : "MagicKeyRevC";
@@ -188,12 +191,41 @@ void ShowWebView2(const std::wstring& url) {
     
     std::wstring app_name_wide(app_name.begin(), app_name.end());
 
+    // Center the window on screen
+    int screen_width = GetSystemMetrics(SM_CXSCREEN);
+    int screen_height = GetSystemMetrics(SM_CYSCREEN);
+    int pos_x = (screen_width - window_width) / 2;
+    int pos_y = (screen_height - window_height) / 2;
+
     HWND hwnd = CreateWindowExW(
-        0, CLASS_NAME, app_name_wide.c_str(),
-        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, window_width, window_height,
+        WS_EX_TOPMOST, CLASS_NAME, app_name_wide.c_str(),
+        WS_OVERLAPPEDWINDOW, pos_x, pos_y, window_width, window_height,
         NULL, NULL, GetModuleHandleW(nullptr), NULL
     );
+    
+    // Properly bring window to foreground
     ShowWindow(hwnd, SW_SHOW);
+    UpdateWindow(hwnd);
+    
+    // Remove topmost after showing (so it doesn't stay always on top)
+    SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+    
+    // Now bring to foreground
+    SetForegroundWindow(hwnd);
+    BringWindowToTop(hwnd);
+    SetFocus(hwnd);
+    
+    // Additional focus handling for stubborn cases
+    SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+    
+    // Flash the window if it still doesn't get focus
+    FLASHWINFO fwi = {};
+    fwi.cbSize = sizeof(fwi);
+    fwi.hwnd = hwnd;
+    fwi.dwFlags = FLASHW_ALL | FLASHW_TIMERNOFG;
+    fwi.uCount = 3;
+    fwi.dwTimeout = 0;
+    FlashWindowEx(&fwi);
 
     ComPtr<ICoreWebView2Controller> controller;
     ComPtr<ICoreWebView2> webview;

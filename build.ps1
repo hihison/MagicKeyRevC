@@ -102,6 +102,7 @@ if ($Static) {
         "C:\msys64\ucrt64\bin\g++.exe"
         "-O2"  # Optimization for release
         "-s"   # Strip symbols for smaller size
+        "-mwindows"  # Windows subsystem (no console window)
         "-static"  # Static linking
         "-static-libgcc"
         "-static-libstdc++"
@@ -130,6 +131,7 @@ if ($Static) {
         "C:\msys64\ucrt64\bin\g++.exe"
         "-O2"  # Optimization for release
         "-s"   # Strip symbols for smaller size
+        "-mwindows"  # Windows subsystem (no console window)
         "-static-libgcc"
         "-static-libstdc++"
         "*.cpp"
@@ -157,6 +159,7 @@ if ($Static) {
         "C:\msys64\ucrt64\bin\g++.exe"
         "-O2"  # Optimization for release
         "-s"   # Strip symbols for smaller size
+        "-mwindows"  # Windows subsystem (no console window)
         "-static-libgcc"
         "-static-libstdc++"
         "*.cpp"

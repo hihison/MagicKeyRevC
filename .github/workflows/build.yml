@@ -204,7 +204,8 @@ jobs:
       run: |
         echo "Starting compilation..."
         # Partial static linking - OpenSSL + MinGW static, WebView2 dynamic
-        g++ -O2 -s -static-libgcc -static-libstdc++ *.cpp \
+        # Added -mwindows to create Windows subsystem app (no console window)
+        g++ -O2 -s -mwindows -static-libgcc -static-libstdc++ *.cpp \
           -o main.exe \
           -lole32 -loleaut32 -lwbemuuid -lwininet \
           -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic \

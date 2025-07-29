@@ -10,6 +10,7 @@
                 "${workspaceFolder}/*.cpp",
                 "-o",
                 "${workspaceFolder}/main.exe",
+                "-mwindows",
                 "-lole32",
                 "-loleaut32",
                 "-lwbemuuid",
