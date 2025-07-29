@@ -15,22 +15,30 @@ Write-Host "Cleaned bin directory" -ForegroundColor Yellow
 
 # Create embedded key header if public key exists
 Write-Host "Creating embedded key header..." -ForegroundColor Yellow
-if (Test-Path ".\public_key.pem") {
-    $publicKeyContent = Get-Content ".\public_key.pem" -Raw
-} elseif (Test-Path ".\public_key.pem.example") {
-    $publicKeyContent = Get-Content ".\public_key.pem.example" -Raw
+
+# Check if embedded_key.h already exists (user's real key)
+if (Test-Path ".\embedded_key.h") {
+    Write-Host "Using existing embedded_key.h (your real key)" -ForegroundColor Green
 } else {
-    Write-Host "Warning: No public key file found, using placeholder" -ForegroundColor Red
-    $publicKeyContent = @"
+    # Create embedded_key.h from available sources
+    if (Test-Path ".\public_key.pem") {
+        $publicKeyContent = Get-Content ".\public_key.pem" -Raw
+        Write-Host "Using public_key.pem" -ForegroundColor Yellow
+    } elseif (Test-Path ".\public_key.pem.example") {
+        $publicKeyContent = Get-Content ".\public_key.pem.example" -Raw
+        Write-Host "Using public_key.pem.example (this is just an example!)" -ForegroundColor Red
+    } else {
+        Write-Host "Warning: No public key file found, using placeholder" -ForegroundColor Red
+        $publicKeyContent = @"
 -----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890abcdef
 EXAMPLE_KEY_REPLACE_WITH_ACTUAL_KEY
 -----END PUBLIC KEY-----
 "@
-}
+    }
 
-# Create embedded_key.h
-$embeddedKeyHeader = @"
+    # Create embedded_key.h
+    $embeddedKeyHeader = @"
 #pragma once
 #include <string>
 
@@ -39,8 +47,9 @@ namespace EmbeddedKey {
 }
 "@
 
-Set-Content -Path ".\embedded_key.h" -Value $embeddedKeyHeader -Encoding UTF8
-Write-Host "Embedded key header created" -ForegroundColor Green
+    Set-Content -Path ".\embedded_key.h" -Value $embeddedKeyHeader -Encoding UTF8
+    Write-Host "Generated embedded_key.h from available sources" -ForegroundColor Green
+}
 
 # Compile the program
 Write-Host "Compiling..." -ForegroundColor Yellow

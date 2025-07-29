@@ -12,6 +12,7 @@ config-prod.json
 *.p12
 *.pfx
 public_key.pem
+embedded_key.h
 
 # Build outputs (except WebView2 SDK files needed for building)
 *.exe

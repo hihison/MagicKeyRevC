@@ -196,7 +196,7 @@ jobs:
         echo '}' >> embedded_key.h
         
         echo "Public key embedded successfully"
-        echo "Embedded key file created:"
+        echo "Embedded key file preview:"
         head -10 embedded_key.h
     
     - name: Build application
