@@ -244,8 +244,29 @@ jobs:
         
         # Copy OpenSSL DLLs with better error handling
         echo "Copying OpenSSL DLLs..."
-        cp /ucrt64/bin/libssl-3-x64.dll dist/ && echo "Copied libssl-3-x64.dll" || echo "Warning: libssl-3-x64.dll not found"
-        cp /ucrt64/bin/libcrypto-3-x64.dll dist/ && echo "Copied libcrypto-3-x64.dll" || echo "Warning: libcrypto-3-x64.dll not found"
+        if cp /ucrt64/bin/libssl-3-x64.dll dist/; then
+          echo "✓ Copied libssl-3-x64.dll"
+        else
+          echo "✗ Failed to copy libssl-3-x64.dll"
+          ls -la /ucrt64/bin/libssl* || echo "No libssl files found"
+        fi
+        
+        if cp /ucrt64/bin/libcrypto-3-x64.dll dist/; then
+          echo "✓ Copied libcrypto-3-x64.dll"
+        else
+          echo "✗ Failed to copy libcrypto-3-x64.dll"
+          ls -la /ucrt64/bin/libcrypto* || echo "No libcrypto files found"
+        fi
+        
+        # Verify critical dependencies are present
+        echo "Verifying critical dependencies in distribution:"
+        for dll in libcrypto-3-x64.dll libssl-3-x64.dll WebView2Loader.dll; do
+          if [ -f "dist/$dll" ]; then
+            echo "✓ $dll present ($(stat -f%z dist/$dll 2>/dev/null || stat -c%s dist/$dll 2>/dev/null || echo 'unknown size') bytes)"
+          else
+            echo "✗ $dll MISSING!"
+          fi
+        done
         
         # Copy additional runtime dependencies that might be needed
         echo "Copying additional runtime dependencies..."

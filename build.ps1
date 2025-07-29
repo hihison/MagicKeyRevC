@@ -123,10 +123,24 @@ if ($LASTEXITCODE -eq 0) {
         "libcrypto-3-x64.dll"
     )
     
+    Write-Host "Copying OpenSSL DLLs..." -ForegroundColor Yellow
     foreach ($dll in $opensslDlls) {
         if (Test-Path "$msys2Path\$dll") {
             Copy-Item "$msys2Path\$dll" ".\bin\" -ErrorAction SilentlyContinue
             Write-Host "Copied $dll from MSYS2" -ForegroundColor Cyan
+        } else {
+            Write-Host "Warning: $dll not found in $msys2Path" -ForegroundColor Red
+        }
+    }
+    
+    # Verify critical dependencies are present
+    Write-Host "Verifying critical dependencies..." -ForegroundColor Yellow
+    $criticalDlls = @("libcrypto-3-x64.dll", "libssl-3-x64.dll", "WebView2Loader.dll")
+    foreach ($dll in $criticalDlls) {
+        if (Test-Path ".\bin\$dll") {
+            Write-Host "✓ $dll present" -ForegroundColor Green
+        } else {
+            Write-Host "✗ $dll MISSING!" -ForegroundColor Red
         }
     }
     
