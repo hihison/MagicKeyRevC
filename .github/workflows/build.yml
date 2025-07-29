@@ -229,57 +229,61 @@ jobs:
       run: |
         mkdir -p dist
         cp main.exe dist/
-        cp WebView2Loader.dll dist/
-        # Note: public_key.pem is now embedded in the executable, not needed as separate file
         
-        # Copy additional WebView2 files (like local build)
-        cp libWebView2Loader.a dist/ || true
-        cp WebView2LoaderStatic.lib dist/ || true
+        # Copy WebView2 files (must match local build exactly)
+        echo "Copying WebView2 files..."
+        cp WebView2Loader.dll dist/ && echo "✓ Copied WebView2Loader.dll" || echo "✗ Failed to copy WebView2Loader.dll"
+        cp WebView2LoaderStatic.lib dist/ && echo "✓ Copied WebView2LoaderStatic.lib" || echo "✗ Failed to copy WebView2LoaderStatic.lib"
+        cp libWebView2Loader.a dist/ && echo "✓ Copied libWebView2Loader.a" || echo "✗ Failed to copy libWebView2Loader.a"
         
-        # Copy MinGW runtime DLLs with better error handling
+        # Copy MinGW runtime DLLs (must match local build exactly)
         echo "Copying MinGW runtime DLLs..."
-        cp /ucrt64/bin/libgcc_s_seh-1.dll dist/ && echo "Copied libgcc_s_seh-1.dll" || echo "Warning: libgcc_s_seh-1.dll not found"
-        cp /ucrt64/bin/libstdc++-6.dll dist/ && echo "Copied libstdc++-6.dll" || echo "Warning: libstdc++-6.dll not found"
-        cp /ucrt64/bin/libwinpthread-1.dll dist/ && echo "Copied libwinpthread-1.dll" || echo "Warning: libwinpthread-1.dll not found"
+        cp /ucrt64/bin/libgcc_s_seh-1.dll dist/ && echo "✓ Copied libgcc_s_seh-1.dll" || echo "✗ Failed to copy libgcc_s_seh-1.dll"
+        cp /ucrt64/bin/libstdc++-6.dll dist/ && echo "✓ Copied libstdc++-6.dll" || echo "✗ Failed to copy libstdc++-6.dll"
+        cp /ucrt64/bin/libwinpthread-1.dll dist/ && echo "✓ Copied libwinpthread-1.dll" || echo "✗ Failed to copy libwinpthread-1.dll"
         
-        # Copy OpenSSL DLLs with better error handling
+        # Copy OpenSSL DLLs (must match local build exactly)
         echo "Copying OpenSSL DLLs..."
-        if cp /ucrt64/bin/libssl-3-x64.dll dist/; then
-          echo "✓ Copied libssl-3-x64.dll"
-        else
-          echo "✗ Failed to copy libssl-3-x64.dll"
-          ls -la /ucrt64/bin/libssl* || echo "No libssl files found"
-        fi
+        cp /ucrt64/bin/libssl-3-x64.dll dist/ && echo "✓ Copied libssl-3-x64.dll" || echo "✗ Failed to copy libssl-3-x64.dll"
+        cp /ucrt64/bin/libcrypto-3-x64.dll dist/ && echo "✓ Copied libcrypto-3-x64.dll" || echo "✗ Failed to copy libcrypto-3-x64.dll"
         
-        if cp /ucrt64/bin/libcrypto-3-x64.dll dist/; then
-          echo "✓ Copied libcrypto-3-x64.dll"
-        else
-          echo "✗ Failed to copy libcrypto-3-x64.dll"
-          ls -la /ucrt64/bin/libcrypto* || echo "No libcrypto files found"
-        fi
+        # Note: embedded_key.h is compiled into the executable, no separate .pem file needed
         
-        # Verify critical dependencies are present
-        echo "Verifying critical dependencies in distribution:"
-        for dll in libcrypto-3-x64.dll libssl-3-x64.dll WebView2Loader.dll; do
-          if [ -f "dist/$dll" ]; then
-            echo "✓ $dll present ($(stat -f%z dist/$dll 2>/dev/null || stat -c%s dist/$dll 2>/dev/null || echo 'unknown size') bytes)"
+        # Verify ALL files from local build are present
+        echo "Verifying distribution matches local build..."
+        expected_files=(
+          "main.exe"
+          "WebView2Loader.dll"
+          "WebView2LoaderStatic.lib"
+          "libWebView2Loader.a"
+          "libgcc_s_seh-1.dll"
+          "libstdc++-6.dll"
+          "libwinpthread-1.dll"
+          "libssl-3-x64.dll"
+          "libcrypto-3-x64.dll"
+        )
+        
+        missing_files=()
+        for file in "${expected_files[@]}"; do
+          if [ -f "dist/$file" ]; then
+            size=$(stat -c%s "dist/$file" 2>/dev/null || echo "unknown")
+            echo "✓ $file present ($size bytes)"
           else
-            echo "✗ $dll MISSING!"
+            echo "✗ $file MISSING!"
+            missing_files+=("$file")
           fi
         done
         
-        # Copy additional runtime dependencies that might be needed
-        echo "Copying additional runtime dependencies..."
+        if [ ${#missing_files[@]} -eq 0 ]; then
+          echo "✅ All required files present - distribution matches local build!"
+        else
+          echo "❌ Missing files: ${missing_files[*]}"
+          echo "Distribution is incomplete!"
+          exit 1
+        fi
         
-        # Try to copy UCRT DLLs (Universal C Runtime)
-        for dll in api-ms-win-crt-*.dll ucrtbase.dll vcruntime*.dll msvcp*.dll; do
-          if [ -f "/c/Windows/System32/$dll" ]; then
-            cp "/c/Windows/System32/$dll" dist/ && echo "Copied $dll" || true
-          fi
-        done
-        
-        # List what we actually copied
-        echo "Files in distribution package:"
+        # List final distribution contents
+        echo "Final distribution contents:"
         ls -la dist/
         
         # Check dependencies of the built executable
