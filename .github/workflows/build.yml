@@ -28,137 +28,57 @@ jobs:
     
     - name: Create config.h from secrets
       shell: bash
-      env:
-        IPCHECK_URL: ${{ secrets.IPCHECK_URL || 'https://ipcheck.siu4.workers.dev/' }}
-        PROXYCHECK_URL: ${{ secrets.PROXYCHECK_URL || 'https://proxycheck.io/v2/' }}
-        BACKEND_URL: ${{ secrets.BACKEND_URL || 'https://example.com/api' }}
-        LOGIN_BASE_URL: ${{ secrets.LOGIN_BASE_URL || 'https://example.com/login' }}
-        USER_AGENT: ${{ secrets.USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) WebView2' }}
-        DCID: ${{ secrets.DCID || 'default' }}
-        APP_VERSION: ${{ secrets.APP_VERSION || '1.01C' }}
-        APP_NAME: ${{ secrets.APP_NAME || 'MagicKeyRevC' }}
-        TIMEOUT_MS: ${{ secrets.TIMEOUT_MS || '30000' }}
-        RETRY_ATTEMPTS: ${{ secrets.RETRY_ATTEMPTS || '3' }}
-        WINDOW_WIDTH: ${{ secrets.WINDOW_WIDTH || '900' }}
-        WINDOW_HEIGHT: ${{ secrets.WINDOW_HEIGHT || '700' }}
-        DISABLE_DEVTOOLS: ${{ secrets.DISABLE_DEVTOOLS || 'true' }}
-        DISABLE_CONTEXT_MENU: ${{ secrets.DISABLE_CONTEXT_MENU || 'true' }}
-        DISABLE_TEXT_SELECTION: ${{ secrets.DISABLE_TEXT_SELECTION || 'true' }}
-        DISABLE_COPY_PASTE: ${{ secrets.DISABLE_COPY_PASTE || 'true' }}
-        DEBUG_ENABLED: ${{ secrets.DEBUG_ENABLED || 'false' }}
-        LOG_ENCRYPTED_DATA: ${{ secrets.LOG_ENCRYPTED_DATA || 'false' }}
-        LOG_SERVER_RESPONSES: ${{ secrets.LOG_SERVER_RESPONSES || 'false' }}
-        LOG_SYSTEM_INFO: ${{ secrets.LOG_SYSTEM_INFO || 'false' }}
       run: |
-        cat > config.h << 'EOF'
-        #pragma once
-        #include <string>
-
-        // Compile-time configuration - edit these values directly
-        namespace Config {
-            // URLs
-            static const std::string IPCHECK_URL = "${IPCHECK_URL}";
-            static const std::string PROXYCHECK_URL = "${PROXYCHECK_URL}";
-            static const std::string BACKEND_URL = "${BACKEND_URL}";
-            static const std::string LOGIN_BASE_URL = "${LOGIN_BASE_URL}";
-            
-            // Network
-            static const std::string USER_AGENT = "${USER_AGENT}";
-            static const int TIMEOUT_MS = ${TIMEOUT_MS};
-            static const int RETRY_ATTEMPTS = ${RETRY_ATTEMPTS};
-            
-            // Security
-            static const std::string PUBLIC_KEY_FILE = "public_key.pem";
-            static const bool DISABLE_DEVTOOLS = ${DISABLE_DEVTOOLS};
-            static const bool DISABLE_CONTEXT_MENU = ${DISABLE_CONTEXT_MENU};
-            static const bool DISABLE_TEXT_SELECTION = ${DISABLE_TEXT_SELECTION};
-            static const bool DISABLE_COPY_PASTE = ${DISABLE_COPY_PASTE};
-            
-            // Application
-            static const std::string APP_VERSION = "${APP_VERSION}";
-            static const std::string APP_NAME = "${APP_NAME}";
-            static const std::string DCID = "${DCID}";
-            static const int WINDOW_WIDTH = ${WINDOW_WIDTH};
-            static const int WINDOW_HEIGHT = ${WINDOW_HEIGHT};
-            
-            // Debug
-            static const bool DEBUG_ENABLED = ${DEBUG_ENABLED};
-            static const bool LOG_ENCRYPTED_DATA = ${LOG_ENCRYPTED_DATA};
-            static const bool LOG_SERVER_RESPONSES = ${LOG_SERVER_RESPONSES};
-            static const bool LOG_SYSTEM_INFO = ${LOG_SYSTEM_INFO};
-        }
-
-        // Simple config class for backward compatibility
-        class ConfigCompat {
-        public:
-            std::string get_ipcheck_url() { return Config::IPCHECK_URL; }
-            std::string get_proxycheck_url() { return Config::PROXYCHECK_URL; }
-            std::string get_backend_url() { return Config::BACKEND_URL; }
-            std::string get_login_base_url() { return Config::LOGIN_BASE_URL; }
-            std::string get_user_agent() { return Config::USER_AGENT; }
-            std::string get_public_key_file() { return Config::PUBLIC_KEY_FILE; }
-            std::string get_app_version() { return Config::APP_VERSION; }
-            std::string get_app_name() { return Config::APP_NAME; }
-            std::string get_dcid() { return Config::DCID; }
-            int get_window_width() { return Config::WINDOW_WIDTH; }
-            int get_window_height() { return Config::WINDOW_HEIGHT; }
-            int get_timeout_ms() { return Config::TIMEOUT_MS; }
-            int get_retry_attempts() { return Config::RETRY_ATTEMPTS; }
-            bool is_debug_enabled() { return Config::DEBUG_ENABLED; }
-            bool should_log_encrypted_data() { return Config::LOG_ENCRYPTED_DATA; }
-            bool should_log_server_responses() { return Config::LOG_SERVER_RESPONSES; }
-            bool should_log_system_info() { return Config::LOG_SYSTEM_INFO; }
-            bool should_disable_devtools() { return Config::DISABLE_DEVTOOLS; }
-            bool should_disable_context_menu() { return Config::DISABLE_CONTEXT_MENU; }
-            bool should_disable_text_selection() { return Config::DISABLE_TEXT_SELECTION; }
-            bool should_disable_copy_paste() { return Config::DISABLE_COPY_PASTE; }
-        };
-
-        // Global config instance for backward compatibility
-        extern ConfigCompat* g_config;
-
-        // Initialize global config (no file needed)
-        inline void init_config(const std::string& config_file = "") {
-            if (!g_config) {
-                g_config = new ConfigCompat();
-            }
-        }
-
-        // Cleanup global config
-        inline void cleanup_config() {
-            if (g_config) {
-                delete g_config;
-                g_config = nullptr;
-            }
-        }
-        EOF
-        
-        # Replace environment variables in the file
-        envsubst < config.h > config.h.tmp && mv config.h.tmp config.h
+        # Use existing config.h if no secrets are available or for PRs
+        if [ "${{ github.event_name }}" = "pull_request" ] || [ -z "${{ secrets.BACKEND_URL }}" ]; then
+          echo "Using existing config.h file"
+          if [ -f "config.h.example" ] && [ ! -f "config.h" ]; then
+            cp config.h.example config.h
+          fi
+        else
+          echo "Creating config.h from secrets"
+          # Create basic config with secrets
+          cp config.h config.h.backup
+          
+          # Replace key values if secrets are provided
+          if [ -n "${{ secrets.BACKEND_URL }}" ]; then
+            sed -i 's|static const std::string BACKEND_URL = "[^"]*"|static const std::string BACKEND_URL = "${{ secrets.BACKEND_URL }}"|' config.h
+          fi
+          
+          if [ -n "${{ secrets.DCID }}" ]; then
+            sed -i 's|static const std::string DCID = "[^"]*"|static const std::string DCID = "${{ secrets.DCID }}"|' config.h
+          fi
+          
+          if [ -n "${{ secrets.LOGIN_BASE_URL }}" ]; then
+            sed -i 's|static const std::string LOGIN_BASE_URL = "[^"]*"|static const std::string LOGIN_BASE_URL = "${{ secrets.LOGIN_BASE_URL }}"|' config.h
+          fi
+          
+          if [ -n "${{ secrets.USER_AGENT }}" ]; then
+            sed -i 's|static const std::string USER_AGENT = "[^"]*"|static const std::string USER_AGENT = "${{ secrets.USER_AGENT }}"|' config.h
+          fi
+        fi
     
     - name: Create public_key.pem from secrets
       shell: bash
-      env:
-        PUBLIC_KEY_PEM: ${{ secrets.PUBLIC_KEY_PEM }}
       run: |
-        if [ -n "$PUBLIC_KEY_PEM" ]; then
-          echo "$PUBLIC_KEY_PEM" > public_key.pem
+        if [ -n "${{ secrets.PUBLIC_KEY_PEM }}" ]; then
+          echo "${{ secrets.PUBLIC_KEY_PEM }}" > public_key.pem
         else
-          echo "Warning: PUBLIC_KEY_PEM secret not set, using example or creating dummy"
+          echo "Warning: PUBLIC_KEY_PEM secret not set"
           if [ -f "public_key.pem.example" ]; then
             cp public_key.pem.example public_key.pem
-          else
-            cat > public_key.pem << 'EOF'
------BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7Q8n9q9JGJ7Q8n9q9JGJ
-7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n
-9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9J
-GJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q
-8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q
-9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ7Q8n9q9JGJ
-QIDAQAB
------END PUBLIC KEY-----
-EOF
+            echo "Using public_key.pem.example"
+          elif [ ! -f "public_key.pem" ]; then
+            echo "Creating dummy public_key.pem"
+            echo "-----BEGIN PUBLIC KEY-----" > public_key.pem
+            echo "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890abcdef" >> public_key.pem
+            echo "1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab" >> public_key.pem
+            echo "cdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890" >> public_key.pem
+            echo "abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678" >> public_key.pem
+            echo "90abcdef1234567890abcdef1234567890abcdef1234567890abcdef123456" >> public_key.pem
+            echo "7890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234" >> public_key.pem
+            echo "QIDAQAB" >> public_key.pem
+            echo "-----END PUBLIC KEY-----" >> public_key.pem
           fi
         fi
     
