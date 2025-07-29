@@ -115,7 +115,9 @@ jobs:
     - name: Create public_key.pem from secrets
       shell: bash
       run: |
-        echo "${{ secrets.PUBLIC_KEY_PEM }}" > public_key.pem
+        cat > public_key.pem << 'EOF'
+        ${{ secrets.PUBLIC_KEY_PEM }}
+        EOF
     
     - name: Build application
       shell: msys2 {0}
@@ -151,7 +153,49 @@ jobs:
         path: dist/
         retention-days: 30
     
-    - name: Create Release (on tag)
+    - name: Get current date and time
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      id: datetime
+      run: |
+        echo "tag=v$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
+        echo "name=MagicKeyRevC-$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
+    
+    - name: Create tag and release
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Create and push tag
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag ${{ steps.datetime.outputs.tag }}
+        git push origin ${{ steps.datetime.outputs.tag }}
+        
+        echo "Created tag: ${{ steps.datetime.outputs.tag }}"
+    
+    - name: Create Release
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.datetime.outputs.tag }}
+        name: ${{ steps.datetime.outputs.name }}
+        body: |
+          **Automated Release**
+          
+          Built from commit: ${{ github.sha }}
+          Branch: ${{ github.ref_name }}
+          
+          **Changes:**
+          - Latest build of MagicKeyRevC
+          - All dependencies included
+          - Ready to run executable
+        files: dist/*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Create Release (on manual tag)
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
