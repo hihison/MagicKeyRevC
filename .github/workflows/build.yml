@@ -133,6 +133,17 @@ jobs:
         
         echo "Config.h created successfully"
     
+    - name: Verify build environment
+      shell: msys2 {0}
+      run: |
+        echo "Checking build environment..."
+        echo "GCC version:"
+        gcc --version
+        echo "Available DLLs in /ucrt64/bin:"
+        ls -la /ucrt64/bin/libgcc* /ucrt64/bin/libstdc* /ucrt64/bin/libwinpthread* /ucrt64/bin/libssl* /ucrt64/bin/libcrypto* 2>/dev/null || echo "Some DLLs not found"
+        echo "WebView2 files in workspace:"
+        ls -la WebView2* lib* 2>/dev/null || echo "Some WebView2 files not found"
+    
     - name: Create public_key.pem from secrets
       shell: bash
       run: |
@@ -160,12 +171,22 @@ jobs:
     - name: Build application
       shell: msys2 {0}
       run: |
+        echo "Starting compilation..."
         g++ -O2 -s -static-libgcc -static-libstdc++ *.cpp \
           -o main.exe \
           -lole32 -loleaut32 -lwbemuuid -lwininet \
           -lssl -lcrypto -lbcrypt -lcrypt32 -lgdi32 -lws2_32 \
           -L. -I./include \
           ./WebView2Loader.dll.lib
+        
+        echo "Build completed. Checking executable..."
+        if [ -f "main.exe" ]; then
+          echo "main.exe created successfully"
+          ls -la main.exe
+        else
+          echo "Error: main.exe not found after compilation"
+          exit 1
+        fi
     
     - name: Create distribution package
       shell: bash
@@ -175,14 +196,24 @@ jobs:
         cp WebView2Loader.dll dist/
         cp public_key.pem dist/
         
-        # Copy MinGW runtime DLLs
-        cp /ucrt64/bin/libgcc_s_seh-1.dll dist/ || true
-        cp /ucrt64/bin/libstdc++-6.dll dist/ || true
-        cp /ucrt64/bin/libwinpthread-1.dll dist/ || true
+        # Copy additional WebView2 files (like local build)
+        cp libWebView2Loader.a dist/ || true
+        cp WebView2LoaderStatic.lib dist/ || true
         
-        # Copy OpenSSL DLLs
-        cp /ucrt64/bin/libssl-3-x64.dll dist/ || true
-        cp /ucrt64/bin/libcrypto-3-x64.dll dist/ || true
+        # Copy MinGW runtime DLLs with better error handling
+        echo "Copying MinGW runtime DLLs..."
+        cp /ucrt64/bin/libgcc_s_seh-1.dll dist/ && echo "Copied libgcc_s_seh-1.dll" || echo "Warning: libgcc_s_seh-1.dll not found"
+        cp /ucrt64/bin/libstdc++-6.dll dist/ && echo "Copied libstdc++-6.dll" || echo "Warning: libstdc++-6.dll not found"
+        cp /ucrt64/bin/libwinpthread-1.dll dist/ && echo "Copied libwinpthread-1.dll" || echo "Warning: libwinpthread-1.dll not found"
+        
+        # Copy OpenSSL DLLs with better error handling
+        echo "Copying OpenSSL DLLs..."
+        cp /ucrt64/bin/libssl-3-x64.dll dist/ && echo "Copied libssl-3-x64.dll" || echo "Warning: libssl-3-x64.dll not found"
+        cp /ucrt64/bin/libcrypto-3-x64.dll dist/ && echo "Copied libcrypto-3-x64.dll" || echo "Warning: libcrypto-3-x64.dll not found"
+        
+        # List what we actually copied
+        echo "Files in distribution package:"
+        ls -la dist/
     
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
