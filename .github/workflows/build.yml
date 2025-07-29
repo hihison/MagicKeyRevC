@@ -203,14 +203,14 @@ jobs:
       shell: msys2 {0}
       run: |
         echo "Starting compilation..."
-        # Full static linking - no DLLs needed!
-        g++ -O2 -s -static -static-libgcc -static-libstdc++ *.cpp \
+        # Partial static linking - OpenSSL + MinGW static, WebView2 dynamic
+        g++ -O2 -s -static-libgcc -static-libstdc++ *.cpp \
           -o main.exe \
           -lole32 -loleaut32 -lwbemuuid -lwininet \
           -Wl,-Bstatic -lssl -lcrypto -Wl,-Bdynamic \
           -lbcrypt -lcrypt32 -lgdi32 -lws2_32 \
           -L. -I./include \
-          ./WebView2LoaderStatic.lib
+          ./WebView2Loader.dll.lib
         
         echo "Build completed. Checking executable..."
         if [ -f "main.exe" ]; then
@@ -231,49 +231,59 @@ jobs:
         mkdir -p dist
         cp main.exe dist/
         
-        echo "Static build complete - single executable with no DLL dependencies!"
+        echo "Partial static build - OpenSSL and MinGW runtime embedded, only WebView2 DLL needed!"
         
-        # Verify the executable is truly self-contained
-        echo "Checking dependencies of statically linked executable:"
-        objdump -p dist/main.exe | grep "DLL Name" | head -20 || echo "✅ No external DLL dependencies found - fully static!"
+        # Copy only the WebView2 DLL (required)
+        echo "Copying WebView2 DLL..."
+        cp WebView2Loader.dll dist/ && echo "✓ Copied WebView2Loader.dll" || echo "✗ Failed to copy WebView2Loader.dll"
+        
+        # Verify the executable dependencies
+        echo "Checking dependencies of partially static executable:"
+        objdump -p dist/main.exe | grep "DLL Name" | head -20 || echo "Could not check dependencies"
         
         echo "Final distribution contents:"
         ls -la dist/
         
-        # Check file size
-        size=$(stat -c%s "dist/main.exe" 2>/dev/null || echo "unknown")
-        echo "✅ main.exe size: $size bytes"
+        # Count files and show size
+        file_count=$(ls -1 dist/ | wc -l)
+        main_size=$(stat -c%s "dist/main.exe" 2>/dev/null || echo "unknown")
+        echo "✅ Package contains $file_count files, main.exe size: $main_size bytes"
     
     - name: Create ZIP package for release
       shell: bash
       run: |
         # Create release package with proper naming
-        RELEASE_NAME="MagicKeyRevC-$(date +'%Y.%m.%d-%H%M')-Standalone"
+        RELEASE_NAME="MagicKeyRevC-$(date +'%Y.%m.%d-%H%M')-Optimized"
         echo "Creating ZIP package: ${RELEASE_NAME}.zip"
         
         # Create a clean release directory
         mkdir -p release
         
-        # Copy the single executable
+        # Copy the executable and required DLL
         cp dist/main.exe release/
+        cp dist/WebView2Loader.dll release/
         
         # Create a simple README for users
         cat > release/README.txt << 'EOF'
-        MagicKeyRevC - Standalone Executable
+        MagicKeyRevC - Optimized Build
         
-        This is a completely self-contained executable with no external dependencies.
+        This is an optimized executable with minimal dependencies.
         
         Installation:
         1. Extract the ZIP file
         2. Run main.exe directly
         
         Features:
-        - All libraries statically linked (no DLLs needed)
-        - Embedded RSA public key encryption
-        - WebView2 support for modern web interface
-        - No installation required - just run!
+        - OpenSSL libraries embedded (no separate crypto DLLs needed)
+        - MinGW runtime embedded (no separate MinGW DLLs needed)
+        - Only WebView2Loader.dll required for web interface
+        - Small package size with maximum compatibility
         
-        File Size: Larger than before due to static linking, but completely portable.
+        Package Contents:
+        - main.exe (main application with embedded libraries)
+        - WebView2Loader.dll (web interface component)
+        
+        Total files: 2 (much smaller than before!)
         EOF
         
         # Create ZIP archive (using PowerShell for better Windows compatibility)
@@ -281,7 +291,7 @@ jobs:
         
         # Verify ZIP was created and show contents
         if [ -f "${RELEASE_NAME}.zip" ]; then
-          echo "✅ Standalone ZIP package created successfully!"
+          echo "✅ Optimized ZIP package created successfully!"
           ls -la "${RELEASE_NAME}.zip"
           
           # Show ZIP contents
@@ -356,7 +366,7 @@ jobs:
         tag_name: ${{ env.TAG_NAME }}
         name: ${{ env.RELEASE_NAME }}
         body: |
-          **📦 MagicKeyRevC - Standalone Release**
+          **📦 MagicKeyRevC - Optimized Release**
           
           🔨 **Built from**: ${{ github.sha }}  
           🌿 **Branch**: ${{ github.ref_name }}  
@@ -364,7 +374,7 @@ jobs:
           
           ## 📋 **Package Contents**
           
-          ✅ **Single self-contained executable** - No DLLs required!
+          ✅ **Minimal dependency package** - Only 2 files needed!
           
           **Included files:**
           - `main.exe` - Complete standalone application (all libraries embedded)

@@ -4,6 +4,7 @@
 
 param(
     [switch]$Static = $false,
+    [switch]$Optimized = $false,
     [switch]$Help = $false
 )
 
@@ -13,18 +14,24 @@ MagicKeyRevC Build Script
 
 Usage:
   .\build.ps1              - Build with DLL dependencies (smaller file, requires DLLs)
-  .\build.ps1 -Static      - Build single executable (larger file, no DLLs needed)
+  .\build.ps1 -Optimized   - Build with minimal dependencies (OpenSSL embedded, only WebView2 DLL)
+  .\build.ps1 -Static      - Build single executable (largest file, no DLLs needed)
   .\build.ps1 -Help        - Show this help
 
-Static Build:
-  - Creates a single .exe file with all libraries embedded
-  - No external DLLs required
-  - Larger file size (~10-20MB)
-  - Maximum portability - run anywhere
+Optimized Build (Recommended):
+  - OpenSSL and MinGW runtime embedded in .exe
+  - Only WebView2Loader.dll required as external dependency
+  - Good balance of size and portability
+  - ~2-3MB total package
+
+Static Build (Experimental):
+  - May have compatibility issues with WebView2
+  - Attempts to embed everything in single .exe
+  - Largest file size
 
 Dynamic Build:
-  - Smaller .exe file (~1-2MB)
-  - Requires separate DLL files
+  - Smallest .exe file (~1-2MB)
+  - Requires separate DLL files (~20MB total)
   - All dependencies copied to bin folder
 "@ -ForegroundColor Cyan
     exit 0
@@ -32,6 +39,8 @@ Dynamic Build:
 
 if ($Static) {
     Write-Host "Building MagicKeyRevC (STATIC - Single Executable)..." -ForegroundColor Green
+} elseif ($Optimized) {
+    Write-Host "Building MagicKeyRevC (OPTIMIZED - Minimal Dependencies)..." -ForegroundColor Green
 } else {
     Write-Host "Building MagicKeyRevC (DYNAMIC - with DLLs)..." -ForegroundColor Green
 }
@@ -115,6 +124,33 @@ if ($Static) {
         "-I.\include"
         ".\WebView2LoaderStatic.lib"
     )
+} elseif ($Optimized) {
+    Write-Host "Using optimized linking (OpenSSL embedded, WebView2 dynamic)..." -ForegroundColor Cyan
+    $compileCommand = @(
+        "C:\msys64\ucrt64\bin\g++.exe"
+        "-O2"  # Optimization for release
+        "-s"   # Strip symbols for smaller size
+        "-static-libgcc"
+        "-static-libstdc++"
+        "*.cpp"
+        "-o"
+        ".\bin\main.exe"
+        "-lole32"
+        "-loleaut32"
+        "-lwbemuuid"
+        "-lwininet"
+        "-Wl,-Bstatic"
+        "-lssl"
+        "-lcrypto"
+        "-Wl,-Bdynamic"
+        "-lbcrypt"
+        "-lcrypt32"
+        "-lgdi32"
+        "-lws2_32"
+        "-L."
+        "-I.\include"
+        ".\WebView2Loader.dll.lib"
+    )
 } else {
     Write-Host "Using dynamic linking (with DLLs)..." -ForegroundColor Cyan
     $compileCommand = @(
@@ -160,6 +196,26 @@ if ($LASTEXITCODE -eq 0) {
                 $deps | ForEach-Object { Write-Host "  $_" -ForegroundColor Cyan }
             } else {
                 Write-Host "✅ No external DLL dependencies - fully static!" -ForegroundColor Green
+            }
+        } catch {
+            Write-Host "Could not check dependencies (objdump not available)" -ForegroundColor Yellow
+        }
+        
+    } elseif ($Optimized) {
+        Write-Host "Optimized build complete - minimal dependencies!" -ForegroundColor Green
+        Write-Host "Only WebView2Loader.dll required as external dependency." -ForegroundColor Cyan
+        
+        # Copy only WebView2 DLL
+        Write-Host "Copying required WebView2 DLL..." -ForegroundColor Yellow
+        Copy-Item ".\WebView2Loader.dll" ".\bin\" -ErrorAction SilentlyContinue
+        
+        # Check dependencies
+        Write-Host "Checking dependencies..." -ForegroundColor Yellow
+        try {
+            $deps = & "C:\msys64\ucrt64\bin\objdump.exe" -p ".\bin\main.exe" | Select-String "DLL Name"
+            if ($deps) {
+                Write-Host "External dependencies:" -ForegroundColor Yellow
+                $deps | ForEach-Object { Write-Host "  $_" -ForegroundColor Cyan }
             }
         } catch {
             Write-Host "Could not check dependencies (objdump not available)" -ForegroundColor Yellow
@@ -240,6 +296,11 @@ if ($LASTEXITCODE -eq 0) {
         Write-Host "📁 Location: .\bin\main.exe" -ForegroundColor Green
         Write-Host "✅ No DLLs required - fully portable!" -ForegroundColor Cyan
         Write-Host "📦 You can distribute just the main.exe file" -ForegroundColor Cyan
+    } elseif ($Optimized) {
+        Write-Host "🎉 OPTIMIZED BUILD: Minimal dependencies!" -ForegroundColor Green
+        Write-Host "📁 Location: .\bin\" -ForegroundColor Green
+        Write-Host "📦 Distribute main.exe + WebView2Loader.dll only" -ForegroundColor Cyan
+        Write-Host "✅ OpenSSL and MinGW runtime embedded in main.exe" -ForegroundColor Cyan
     } else {
         Write-Host "🎉 DYNAMIC BUILD: Executable and dependencies created!" -ForegroundColor Green
         Write-Host "📁 Location: .\bin\" -ForegroundColor Green
@@ -263,12 +324,17 @@ if ($LASTEXITCODE -eq 0) {
     }
     
     $totalSizeMB = $totalSize / 1MB
-    Write-Host "`nTotal package size: {0:N1} MB" -f $totalSizeMB -ForegroundColor Yellow
+    Write-Host ("`nTotal package size: {0:N1} MB" -f $totalSizeMB) -ForegroundColor Yellow
     
     if ($Static) {
-        Write-Host "`n💡 To build with DLLs instead: .\build.ps1" -ForegroundColor DarkGray
-    } else {
+        Write-Host "`n💡 To build with minimal dependencies: .\build.ps1 -Optimized" -ForegroundColor DarkGray
+        Write-Host "💡 To build with DLLs: .\build.ps1" -ForegroundColor DarkGray
+    } elseif ($Optimized) {
         Write-Host "`n💡 To build single executable: .\build.ps1 -Static" -ForegroundColor DarkGray
+        Write-Host "💡 To build with all DLLs: .\build.ps1" -ForegroundColor DarkGray
+    } else {
+        Write-Host "`n💡 To build with minimal dependencies: .\build.ps1 -Optimized" -ForegroundColor DarkGray
+        Write-Host "💡 To build single executable: .\build.ps1 -Static" -ForegroundColor DarkGray
     }
     
 } else {
