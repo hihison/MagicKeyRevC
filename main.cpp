@@ -8,6 +8,7 @@
 #include "gethddid.h"
 #include "getmachineguid.h"
 #include "getipinfo.h"
+#include "embedded_key.h"
 #include "json.hpp"
 #include "encrypt_data.h"
 #include "send_data.h"
@@ -273,10 +274,16 @@ int main() {
             std::cout << "\nData to encrypt:\n" << data_to_encrypt.dump(4) << std::endl;
         }
 
-        std::string encrypted_data = encrypt_data(
-            data_to_encrypt,
-            g_config->get_public_key_file()
-        );
+        std::string encrypted_data;
+        
+        // Use embedded public key instead of file
+        if (g_config && !g_config->get_public_key_file().empty()) {
+            // Legacy: use file if specified
+            encrypted_data = encrypt_data(data_to_encrypt, g_config->get_public_key_file());
+        } else {
+            // Modern: use embedded key
+            encrypted_data = encrypt_data_from_key_string(data_to_encrypt, EmbeddedKey::PUBLIC_KEY_PEM);
+        }
 
         if (!encrypted_data.empty()) {
             if (debug_enabled && g_config->should_log_encrypted_data()) {

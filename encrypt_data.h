@@ -32,12 +32,19 @@ inline std::string base64_encode(const std::string& data) {
     return encoded;
 }
 
-// Encrypt using RSA OAEP + SHA-256 and base64-encode output
+// Encrypt using RSA OAEP + SHA-256 and base64-encode output (from file)
 inline std::string encrypt_data(const nlohmann::json& data, const std::string& public_key_path) {
     std::string data_str = data.dump();
     std::string pubkey_str = read_file(public_key_path);
+    
+    return encrypt_data_from_key_string(data, pubkey_str);
+}
 
-    BIO* bio = BIO_new_mem_buf(pubkey_str.data(), (int)pubkey_str.size());
+// Encrypt using RSA OAEP + SHA-256 and base64-encode output (from string)
+inline std::string encrypt_data_from_key_string(const nlohmann::json& data, const std::string& public_key_content) {
+    std::string data_str = data.dump();
+
+    BIO* bio = BIO_new_mem_buf(public_key_content.data(), (int)public_key_content.size());
     if (!bio) return "";
 
     EVP_PKEY* pubkey = PEM_read_bio_PUBKEY(bio, nullptr, nullptr, nullptr);

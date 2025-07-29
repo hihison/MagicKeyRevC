@@ -13,6 +13,35 @@ if (!(Test-Path ".\bin")) {
 Remove-Item ".\bin\*" -Force -Recurse -ErrorAction SilentlyContinue
 Write-Host "Cleaned bin directory" -ForegroundColor Yellow
 
+# Create embedded key header if public key exists
+Write-Host "Creating embedded key header..." -ForegroundColor Yellow
+if (Test-Path ".\public_key.pem") {
+    $publicKeyContent = Get-Content ".\public_key.pem" -Raw
+} elseif (Test-Path ".\public_key.pem.example") {
+    $publicKeyContent = Get-Content ".\public_key.pem.example" -Raw
+} else {
+    Write-Host "Warning: No public key file found, using placeholder" -ForegroundColor Red
+    $publicKeyContent = @"
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890abcdef
+EXAMPLE_KEY_REPLACE_WITH_ACTUAL_KEY
+-----END PUBLIC KEY-----
+"@
+}
+
+# Create embedded_key.h
+$embeddedKeyHeader = @"
+#pragma once
+#include <string>
+
+namespace EmbeddedKey {
+    static const std::string PUBLIC_KEY_PEM = R`($publicKeyContent)`;
+}
+"@
+
+Set-Content -Path ".\embedded_key.h" -Value $embeddedKeyHeader -Encoding UTF8
+Write-Host "Embedded key header created" -ForegroundColor Green
+
 # Compile the program
 Write-Host "Compiling..." -ForegroundColor Yellow
 $compileCommand = @(
@@ -52,8 +81,7 @@ if ($LASTEXITCODE -eq 0) {
     Copy-Item ".\WebView2LoaderStatic.lib" ".\bin\" -ErrorAction SilentlyContinue
     Copy-Item ".\libWebView2Loader.a" ".\bin\" -ErrorAction SilentlyContinue
     
-    # Copy public key
-    Copy-Item ".\public_key.pem" ".\bin\" -ErrorAction SilentlyContinue
+    # Note: public_key.pem is now embedded in the executable, not needed as separate file
     
     # Copy MinGW runtime DLLs if they exist in the current directory
     $mingwDlls = @(

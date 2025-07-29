@@ -77,7 +77,8 @@ jobs:
         
         echo '    static const int TIMEOUT_MS = 30000;' >> config.h
         echo '    static const int RETRY_ATTEMPTS = 3;' >> config.h
-        echo '    static const std::string PUBLIC_KEY_FILE = "public_key.pem";' >> config.h
+        echo '    static const std::string PUBLIC_KEY_FILE = "";' >> config.h
+        echo '    static const bool USE_EMBEDDED_KEY = true;' >> config.h
         echo '    static const bool DISABLE_DEVTOOLS = true;' >> config.h
         echo '    static const bool DISABLE_CONTEXT_MENU = true;' >> config.h
         echo '    static const bool DISABLE_TEXT_SELECTION = true;' >> config.h
@@ -179,6 +180,25 @@ jobs:
           fi
         fi
     
+    - name: Embed public key in source code
+      shell: bash
+      run: |
+        echo "Embedding public key in source code..."
+        
+        # Create embedded_key.h with the public key as a string constant
+        echo '#pragma once' > embedded_key.h
+        echo '#include <string>' >> embedded_key.h
+        echo '' >> embedded_key.h
+        echo 'namespace EmbeddedKey {' >> embedded_key.h
+        echo '    static const std::string PUBLIC_KEY_PEM = R"(' >> embedded_key.h
+        cat public_key.pem >> embedded_key.h
+        echo ')";' >> embedded_key.h
+        echo '}' >> embedded_key.h
+        
+        echo "Public key embedded successfully"
+        echo "Embedded key file created:"
+        head -10 embedded_key.h
+    
     - name: Build application
       shell: msys2 {0}
       run: |
@@ -210,7 +230,7 @@ jobs:
         mkdir -p dist
         cp main.exe dist/
         cp WebView2Loader.dll dist/
-        cp public_key.pem dist/
+        # Note: public_key.pem is now embedded in the executable, not needed as separate file
         
         # Copy additional WebView2 files (like local build)
         cp libWebView2Loader.a dist/ || true
