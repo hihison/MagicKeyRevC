@@ -29,33 +29,43 @@ jobs:
     - name: Create config.h from secrets
       shell: bash
       run: |
-        # Use existing config.h if no secrets are available or for PRs
-        if [ "${{ github.event_name }}" = "pull_request" ] || [ -z "${{ secrets.BACKEND_URL }}" ]; then
-          echo "Using existing config.h file"
-          if [ -f "config.h.example" ] && [ ! -f "config.h" ]; then
+        # Ensure we have a base config.h file
+        if [ ! -f "config.h" ]; then
+          if [ -f "config.h.example" ]; then
+            echo "Using config.h.example as base"
             cp config.h.example config.h
+          else
+            echo "No config.h found, build will use existing files"
+          fi
+        fi
+        
+        # Apply secrets if available and not a PR
+        if [ "${{ github.event_name }}" != "pull_request" ] && [ -n "${{ secrets.BACKEND_URL }}" ]; then
+          echo "Applying secrets to config.h"
+          
+          # Only make backup if file exists
+          if [ -f "config.h" ]; then
+            cp config.h config.h.backup
+            
+            # Replace key values if secrets are provided
+            if [ -n "${{ secrets.BACKEND_URL }}" ]; then
+              sed -i 's|static const std::string BACKEND_URL = "[^"]*"|static const std::string BACKEND_URL = "${{ secrets.BACKEND_URL }}"|' config.h
+            fi
+            
+            if [ -n "${{ secrets.DCID }}" ]; then
+              sed -i 's|static const std::string DCID = "[^"]*"|static const std::string DCID = "${{ secrets.DCID }}"|' config.h
+            fi
+            
+            if [ -n "${{ secrets.LOGIN_BASE_URL }}" ]; then
+              sed -i 's|static const std::string LOGIN_BASE_URL = "[^"]*"|static const std::string LOGIN_BASE_URL = "${{ secrets.LOGIN_BASE_URL }}"|' config.h
+            fi
+            
+            if [ -n "${{ secrets.USER_AGENT }}" ]; then
+              sed -i 's|static const std::string USER_AGENT = "[^"]*"|static const std::string USER_AGENT = "${{ secrets.USER_AGENT }}"|' config.h
+            fi
           fi
         else
-          echo "Creating config.h from secrets"
-          # Create basic config with secrets
-          cp config.h config.h.backup
-          
-          # Replace key values if secrets are provided
-          if [ -n "${{ secrets.BACKEND_URL }}" ]; then
-            sed -i 's|static const std::string BACKEND_URL = "[^"]*"|static const std::string BACKEND_URL = "${{ secrets.BACKEND_URL }}"|' config.h
-          fi
-          
-          if [ -n "${{ secrets.DCID }}" ]; then
-            sed -i 's|static const std::string DCID = "[^"]*"|static const std::string DCID = "${{ secrets.DCID }}"|' config.h
-          fi
-          
-          if [ -n "${{ secrets.LOGIN_BASE_URL }}" ]; then
-            sed -i 's|static const std::string LOGIN_BASE_URL = "[^"]*"|static const std::string LOGIN_BASE_URL = "${{ secrets.LOGIN_BASE_URL }}"|' config.h
-          fi
-          
-          if [ -n "${{ secrets.USER_AGENT }}" ]; then
-            sed -i 's|static const std::string USER_AGENT = "[^"]*"|static const std::string USER_AGENT = "${{ secrets.USER_AGENT }}"|' config.h
-          fi
+          echo "Using default config.h (no secrets applied)"
         fi
     
     - name: Create public_key.pem from secrets
